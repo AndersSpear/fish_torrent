@@ -4,7 +4,7 @@
 
 
 
-fn update_peer_list(peers list){
+fn update_peer_list(peerid:u32, ip:u32, port:u32){
 
 }
 
