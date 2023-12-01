@@ -4,7 +4,7 @@
 
 
 
-fn update_peer_list(){
+fn update_peer_list(peers list){
 
 }
 
