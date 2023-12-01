@@ -2,6 +2,24 @@
 // handles epoll event loop
 // triggers peer tracker, p2p, strategy, on a timer
 
+
+
+// loop{
+//     epollwait();
+//     for(events){
+//         if(tracker_interval){
+//             update_tracker();
+//         }
+//         if(tracker_response){
+//             handle_tracker_response();
+//         }
+//         if(peer_response){
+//             handle_peer_response();
+//         }
+//     }
+// }
+
+
 fn main() {
 
     println!("Hello, world!");
