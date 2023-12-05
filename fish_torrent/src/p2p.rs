@@ -1,19 +1,22 @@
 // sending and recieving from peers
+use super::peers::Peer;
 
 struct Message {
     // TODO: Some information about peer
+    peer: Peer,
     m_type: MessageType
 }
 
 // A little added enum with associated data structs from Tien :)
 // Types and names are not final, just figured I'd create this since I'm here
+// TODO: Confirm that this is desired.
 enum MessageType {
     Choke,
     Unchoke,
     Interested,
     NotInterested,
     Have {index: usize},
-    Bitfield {bitfield: Vec<bool>},
+    Bitfield {bitfield: Vec<bool>}, // TODO: Temp type for bitfield
     Request {index: usize, begin: usize, length: usize},
     Piece {index: usize, begin: usize, block: usize},
     Cancel {index: usize, begin: usize, length: usize},
@@ -23,7 +26,7 @@ enum MessageType {
 }
 
 fn handle_message(msg: &str){}
-// Another way to implement the above is an associated function/method
+// TODO: Another way to implement the above is an associated function/method
 impl Message {
     // Instead of passing the msg in, now we can call the function via
     // msg.handle_message() <--- Isn't that cool?

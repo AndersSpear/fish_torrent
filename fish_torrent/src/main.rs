@@ -2,6 +2,7 @@
 // handles epoll event loop
 // triggers peer tracker, p2p, strategy, on a timer
 
+mod peers;
 mod p2p;
 
 // loop{
