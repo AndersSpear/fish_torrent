@@ -1,4 +1,27 @@
 // sending and recieving from peers
 
+// A little added enum with associated data structs from Tien :)
+// Types and names are not final, just figured I'd create this since I'm here
+enum Message {
+    Choke,
+    Unchoke,
+    Interested,
+    NotInterested,
+    Have {index: usize},
+    Bitfield {bitfield: Vec<bool>},
+    Request {index: usize, begin: usize, length: usize},
+    Piece {index: usize, begin: usize, block: usize},
+    Cancel {index: usize, begin: usize, length: usize},
+    KeepAlive // KeepAlive is last because it does not have an associated
+              // id in the protocol. This way choke starts at id 0.
+    //Port // DHT Tracker is not supported, so this msg is not handled.
+}
 
-fn handle_message(&str msg){}
+fn handle_message(msg: &str){}
+// Another way to implement the above is an associated function/method
+impl Message {
+    // Instead of passing the msg in, now we can call the function via
+    // msg.handle_message() <--- Isn't that cool?
+    // Your preference!
+    fn handle_message(&self) {}
+}
