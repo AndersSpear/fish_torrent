@@ -1,8 +1,13 @@
 // sending and recieving from peers
 
+struct Message {
+    // TODO: Some information about peer
+    m_type: MessageType
+}
+
 // A little added enum with associated data structs from Tien :)
 // Types and names are not final, just figured I'd create this since I'm here
-enum Message {
+enum MessageType {
     Choke,
     Unchoke,
     Interested,
@@ -23,5 +28,13 @@ impl Message {
     // Instead of passing the msg in, now we can call the function via
     // msg.handle_message() <--- Isn't that cool?
     // Your preference!
-    fn handle_message(&self) {}
+    fn handle_message(&self) {
+        match self.m_type {
+            MessageType::Choke => handle_choke(&self),
+            _ => todo!() //TODO
+        }
+    }
 }
+
+// TODO add the remaining functions!
+fn handle_choke(msg: &Message) {}
