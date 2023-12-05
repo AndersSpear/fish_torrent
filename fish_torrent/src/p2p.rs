@@ -1,5 +1,6 @@
 // sending and recieving from peers
 use super::peers::Peer;
+use bitvec::prelude::*;
 
 struct Message {
     // TODO: Some information about peer
