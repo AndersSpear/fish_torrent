@@ -2,6 +2,7 @@
 // recieves peer list from tracker
 // updates which peers we are communicating with
 use std::net::TcpStream;
+use bitvec::prelude::*;
 
 pub struct Peer {
     peer_id: [u8; 20],
@@ -10,8 +11,8 @@ pub struct Peer {
     am_interested: bool,
     peer_choking: bool,
     peer_interested: bool,
-    piece_bitmap: Vec<bool>,
-    interested_bitmap: Vec<bool>
+    piece_bitmap: BitVec,
+    interested_bitmap: BitVec
 }
 
 impl Peer {
