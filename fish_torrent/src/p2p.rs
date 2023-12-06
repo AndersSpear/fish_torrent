@@ -12,6 +12,7 @@ struct Message<'a> {
 // A little added enum with associated data structs from Tien :)
 // Types and names are not final, just figured I'd create this since I'm here
 // TODO: Confirm that this is desired.
+//length is ususlaly 16Kib, 2^14
 enum MessageType {
     Choke,
     Unchoke,
@@ -31,9 +32,8 @@ enum MessageType {
 
 
 
-// called when socket triggers, either a handshake response or a message
-fn handle_message(sockfd: u32) -> Message<'static>{
-    let peer: &Peer = peers::find_peer_by_sockfd(sockfd);
+// called when socket triggers, pass in a peer that got triggered
+fn handle_message<'a>(peer: &'a Peer) -> Message<'a>{
     //let msg: Message<'a> = get_message(peer);
 
     //read the message into a buffer
@@ -54,17 +54,17 @@ fn handle_message(sockfd: u32) -> Message<'static>{
 // }
 
 // TODO: Another way to implement the above is an associated function/method
-impl Message<'_> {
-    // Instead of passing the msg in, now we can call the function via
-    // msg.handle_message() <--- Isn't that cool?
-    // Your preference!
-    fn handle_message(&self) {
-        match self.m_type {
-            MessageType::Choke => handle_choke(&self),
-            _ => todo!() //TODO
-        }
-    }
-}
+// impl Message<'_> {
+//     // Instead of passing the msg in, now we can call the function via
+//     // msg.handle_message() <--- Isn't that cool?
+//     // Your preference!
+//     fn handle_message(&self) {
+//         match self.m_type {
+//             MessageType::Choke => handle_choke(&self),
+//             _ => todo!() //TODO
+//         }
+//     }
+// }
 
 // if we get chcked, make sure to remove the send buffer for that person
 fn handle_choke(msg: &Message) {}
