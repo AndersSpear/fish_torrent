@@ -34,9 +34,9 @@ impl Peer {
     }
 }
 
-pub fn find_peer(peer_id: &[u8; 20]) -> &Peer {}
+pub fn find_peer(peer_id: &[u8; 20]) -> &'static Peer {}
 
-pub fn find_peer_by_sockfd(sockfd: u32) -> &Peer {}
+pub fn find_peer_by_sockfd(sockfd: u32) -> &'static Peer {}
 
 fn update_peer_list(peerid: u32, ip: u32, port: u32){
 
