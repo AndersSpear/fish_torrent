@@ -24,7 +24,9 @@ impl Peer {
 
 pub fn find_peer(peer: &Peer) {}
 
-fn update_peer_list(peerid:u32, ip:u32, port:u32){
+pub fn find_peer_by_sockfd(sockfd: u32) {}
+
+fn update_peer_list(peerid: u32, ip: u32, port: u32){
 
 }
 

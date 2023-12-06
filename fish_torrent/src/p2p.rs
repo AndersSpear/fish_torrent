@@ -1,11 +1,11 @@
 #![allow(dead_code)] 
 // sending and recieving from peers
-use super::peers::Peer;
+use super::peers::{self, Peer};
 use bitvec::prelude::*;
 
-struct Message {
+struct Message<'a> {
     // TODO: Some information about peer
-    peer: &'static Peer,
+    peer: &'a Peer,
     m_type: MessageType
 }
 
@@ -29,18 +29,18 @@ enum MessageType {
 }
 
 fn handle_message(sockfd: &u32){
-    let peer:&'static Peer = get_peer_from_sockfd(sockfd);
+    let peer: &Peer = peers::find_peer_by_sockfd(sockfd);
     let msg = get_message(peer);
 }
 
 
-fun get_message(peer: &Peer) -> Message {
+fn get_message(peer: &Peer) -> Message {
     let msg = Message{peer, m_type: MessageType::Undefined};
     msg
 }
 
 // TODO: Another way to implement the above is an associated function/method
-impl Message {
+impl Message<'_> {
     // Instead of passing the msg in, now we can call the function via
     // msg.handle_message() <--- Isn't that cool?
     // Your preference!
