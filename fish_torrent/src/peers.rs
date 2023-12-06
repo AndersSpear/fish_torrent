@@ -2,7 +2,12 @@
 // recieves peer list from tracker
 // updates which peers we are communicating with
 use std::net::TcpStream;
+use std::collections::HashMap;
 use bitvec::prelude::*;
+
+thread_local! {
+    static peer_list;
+}
 
 pub struct Peer {
     peer_id: [u8; 20],
@@ -20,6 +25,10 @@ impl Peer {
     pub fn add_peer(&self) {}
     pub fn remove_peer(&self) {}
     pub fn disconnect_peer(&self) {}
+
+    pub fn get_socket(&self) -> &TcpStream {
+        &self.socket
+    }
 }
 
 pub fn find_peer(peer: &Peer) {}
