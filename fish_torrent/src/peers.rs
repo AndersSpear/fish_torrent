@@ -1,3 +1,5 @@
+use std::cell::LazyCell;
+
 // holds globabl peer list
 // recieves peer list from tracker
 // updates which peers we are communicating with
@@ -6,7 +8,8 @@ use std::collections::HashMap;
 use bitvec::prelude::*;
 
 thread_local! {
-    static peer_list;
+    static peer_list: LazyCell<HashMap<[u8; 20], Peer>> =
+                                            LazyCell::new(|| HashMap::new());
 }
 
 pub struct Peer {
@@ -31,9 +34,9 @@ impl Peer {
     }
 }
 
-pub fn find_peer(peer: &Peer) {}
+pub fn find_peer(peer_id: &[u8; 20]) -> &Peer {}
 
-pub fn find_peer_by_sockfd(sockfd: u32) {}
+pub fn find_peer_by_sockfd(sockfd: u32) -> &Peer {}
 
 fn update_peer_list(peerid: u32, ip: u32, port: u32){
 
