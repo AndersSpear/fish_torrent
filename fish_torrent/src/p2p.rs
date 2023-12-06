@@ -33,6 +33,7 @@ fn handle_message(sockfd: &u32){
     let msg = get_message(peer);
 }
 
+
 fun get_message(peer: &Peer) -> Message {
     let msg = Message{peer, m_type: MessageType::Undefined};
     msg
