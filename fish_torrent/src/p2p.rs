@@ -1,11 +1,13 @@
 #![allow(dead_code)] 
+#![warn(missing_docs)]
+
 // sending and recieving from peers
 use super::peers::Peer;
 use bitvec::prelude::*;
 use std::net::TcpStream;
 use std::io::Write;
 
-struct Message<'a> {
+pub struct Message<'a> {
     // TODO: Some information about peer
     peer: &'a Peer,
     m_type: MessageType
@@ -15,7 +17,7 @@ struct Message<'a> {
 // Types and names are not final, just figured I'd create this since I'm here
 // TODO: Confirm that this is desired.
 //length is ususlaly 16Kib, 2^14
-enum MessageType {
+pub enum MessageType {
     Choke,
     Unchoke,
     Interested,
@@ -35,7 +37,7 @@ enum MessageType {
 
 
 // called when socket triggers, pass in a peer that got triggered
-fn handle_message<'a>(peer: &'a Peer) -> Message<'a>{
+pub fn handle_message<'a>(peer: &'a Peer) -> Message<'a>{
     //let msg: Message<'a> = get_message(peer);
 
     //read the message into a buffer
@@ -77,7 +79,7 @@ fn send_message(msg: Message) {}
 
 // called right after we created a new peer
 // sends the initial handshake
-fn send_handshake(peer: &Peer) {
+pub fn send_handshake(peer: &Peer) {
     let sock: &mut TcpStream = peer.get_socket();
     let mut buf: Vec<u8> = vec![0;68];
     buf[0] = 19;
