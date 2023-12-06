@@ -1,7 +1,9 @@
 #![allow(dead_code)] 
 // sending and recieving from peers
-use super::peers::{self, Peer};
+use super::peers::Peer;
 use bitvec::prelude::*;
+use std::net::TcpStream;
+use std::io::Write;
 
 struct Message<'a> {
     // TODO: Some information about peer
@@ -76,6 +78,13 @@ fn send_message(msg: Message) {}
 // called right after we created a new peer
 // sends the initial handshake
 fn send_handshake(peer: &Peer) {
+    let sock: &mut TcpStream = peer.get_socket();
+    let mut buf: Vec<u8> = vec![0;68];
+    buf[0] = 19;
+    buf[1..20].copy_from_slice(b"BitTorrent protocol");
+    buf[28..48].copy_from_slice(&super::torrent::get_info_hash());
+    buf[48..68].copy_from_slice(&super::torrent::get_peer_id());
+    sock.write(&buf);
     //get tcpstream
     //create handshake message
     //send the handshake message
