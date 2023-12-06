@@ -1,79 +1,131 @@
-//self contained code to interface with tracker
-//updates peers every interval
-//import something to have access to the TCP stream
-
-
 use std::io::prelude::*;
 use std::net::TcpStream;
 use urlencoding::encode;
 
-// you just got a http response back from the tracker, process it!
-// call peers::update_peer_list() with the list of peers
-fn handle_tracker_response(/*no arguments*/){
-    // called in alexandra's code (main.rs) when a response comes in.
-    //1. HTTP get response
-    //2. look at TcpStream for the response
-    //3. parse response
-    // 
-    //the response will be bencoded
-    // unbencode
-    // extract a list of peers from the bencoded data
-
+pub struct TrackerRequest {
+    info_hash: String,
+    peer_id: String,
+    port: u16,
+    uploaded: u64,
+    downloaded: u64,
+    left: u64,
 }
 
-//take in url.
-// form req
-    //specific format
-// send req
-pub fn send_tracker_request() -> std::io::Result<()>{
-    // BitTorrent-specific parameters
-    let info_hash = "aaaaaaaaaaaaaaaaaaaa"; // needs to be 20 bytes
-    let peer_id = "aaaaaaaaaaaaaaaaaaaa";     // needs to be 20 bytes
-    let port = 6881; //port that we're running on
-    let uploaded = 0; //
-    let downloaded = 0;
-    let left = 0;
+impl TrackerRequest {
+    // Constructor to create a new TrackerRequest
+    pub fn new(info_hash: &str, peer_id: &str, port: u16, uploaded: u64, downloaded: u64, left: u64) -> TrackerRequest {
+        TrackerRequest {
+            info_hash: info_hash.to_string(),
+            peer_id: peer_id.to_string(),
+            port,
+            uploaded,
+            downloaded,
+            left,
+        }
+    }
 
-    // URL-encode the info_hash and peer_id
+    // Method to construct the tracker request URL
+    pub fn construct_request_url(&self) -> String {
+        let encoded_info_hash = encode(&self.info_hash);
+        let encoded_peer_id = encode(&self.peer_id);
+
+        format!(
+            "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
+            encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left
+        )
+    }
+}
+
+/// Constructs a tracker request URL with the given parameters.
+///
+/// # Arguments
+/// * `info_hash` - A 20-byte string representing the info hash.
+/// * `peer_id` - A 20-byte string representing the peer id.
+/// * `port` - The port number the client is listening on.
+/// * `uploaded` - The total amount uploaded so far.
+/// * `downloaded` - The total amount downloaded so far.
+/// * `left` - The total amount left to download.
+pub fn construct_tracker_request(info_hash: &str, peer_id: &str, port: u16, uploaded: u64, downloaded: u64, left: u64) -> String {
     let encoded_info_hash = encode(info_hash);
     let encoded_peer_id = encode(peer_id);
 
-    // Construct the tracker GET request URL
-    let tracker_url = format!(
-        "/announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1",
+    format!(
+        "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
         encoded_info_hash, encoded_peer_id, port, uploaded, downloaded, left
-    );
+    )
+}
 
-    // Construct the GET request string
-    let request_str = format!("GET {} HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n", tracker_url);
-    //let request_str = "GET /announce HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n";
-
-    // Convert the request string to bytes
-    let request_bytes = request_str.as_bytes();
-
-    // Connect to the tracker
+/// Sends a tracker request and returns the response as a String.
+///
+/// # Arguments
+/// * `request` - The tracker request string to be sent.
+pub fn send_tracker_request(tracker_request: &TrackerRequest) -> std::io::Result<String> {
+    let request = tracker_request.construct_request_url();
     let mut stream = TcpStream::connect("poole.cs.umd.edu:6969")?;
-    stream.write_all(request_bytes)?;
+    stream.write_all(request.as_bytes())?;
     stream.flush()?;
 
-    // Read the response from the tracker
     let mut response = Vec::new();
     stream.read_to_end(&mut response)?;
 
-    // Convert the response to a string and print it
-    let response_str = String::from_utf8_lossy(&response);
-    println!("{}", response_str);
-
-    Ok(())
+    Ok(String::from_utf8_lossy(&response).to_string())
 }
 
-// send the initial request to the tracker. (not necessary?)
-fn init_tracker(){
-    //1. send_tracker_request
-    //2. handle_tracker_response
+/// Processes the HTTP response received from the tracker.
+/// 
+/// This function should parse the bencoded response and extract a list of peers.
+fn handle_tracker_response() {
+    // TODO: Implement this function.
+    // The response will be bencoded. Unbencode it and extract a list of peers.
 }
 
-// timeout has passed, ask the tracker for new data, and update it on our status as well
-fn update_tracker(){
-    //
+/// Initializes the tracker by sending the initial request.
+/// This function may not be necessary depending on the protocol requirements.
+fn init_tracker() {
+    // TODO: Implement this function if needed.
+    // This might involve calling `send_tracker_request` and `handle_tracker_response`.
+}
+
+/// Updates the tracker with the current status and requests new data.
+fn update_tracker() {
+    // TODO: Implement periodic updates to the tracker here.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_construct_tracker_request() {
+        let request = construct_tracker_request(
+            "aaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbb",
+            6881,
+            0,
+            0,
+            0,
+        );
+
+        assert!(request.contains("info_hash=aaaaaaaaaaaaaaaaaaaa"));
+        assert!(request.contains("peer_id=bbbbbbbbbbbbbbbbbbbb"));
+        // Additional assertions can be added here.
+    }
+
+    #[test]
+    fn test_send_tracker_request() {
+        let tracker_request = TrackerRequest::new(
+            "aaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbb",
+            6881,
+            0,
+            0,
+            0,
+        );
+
+        // this should only fail if the UMD server is down.
+        let response = send_tracker_request(&tracker_request).unwrap();
+
+        // 'interval' is inside every bencode.
+        assert!(response.contains("interval"));
+    }
 }

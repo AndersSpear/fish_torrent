@@ -21,12 +21,8 @@ mod p2p;
 // }
 
 
-use std::io::prelude::*;
-use std::net::TcpStream;
-use urlencoding::encode;
 mod tracker;
 
 fn main() -> std::io::Result<()> {
-    tracker::send_tracker_request();
     Ok(())
 }
