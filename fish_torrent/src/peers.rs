@@ -26,8 +26,8 @@ impl Peer {
     pub fn remove_peer(&self) {}
     pub fn disconnect_peer(&self) {}
 
-    pub fn get_socket(&self) -> &TcpStream {
-        &self.socket
+    pub fn get_socket(&self) -> &mut TcpStream {
+        &mut self.socket
     }
 }
 
