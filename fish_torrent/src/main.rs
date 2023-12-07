@@ -124,4 +124,39 @@ fn handle_tracker_response() {
 }
 
 /// handles the message it got from a peer
-fn handle_peer(socket: &TcpStream) {}
+fn handle_peer(socket: &TcpStream) {
+    // recv_message(socket);
+    // match () {
+    //     Choke => {
+
+    //     }
+    //     Unchoke => {
+
+    //     }
+    //     Interested => {
+
+    //     }
+    //     NotInterested => {
+
+    //     }
+    //     Have(index) => {
+    //     }
+    //     Bitfield(field) => {
+    //     }
+    //     Request(index, begin, length) => {
+    //     }
+    //     Piece(index, begin, block) => {
+    //     }
+    //     Cancel(index, begin, length) => {
+    //     }
+    //     KeepAlive => {
+
+    //     }
+    //     Undefined => {
+
+    //     }
+    //     HandshakeResponse => {
+
+    //     }
+    // }
+}
