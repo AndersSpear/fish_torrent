@@ -1,7 +1,11 @@
 #![feature(lazy_cell)]
-// handles initial call to tracker and peer
-// handles epoll event loop
-// triggers peer tracker, p2p, strategy, on a timer
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unreachable_code)]
+#![warn(missing_docs)]
+//! handles initial call to tracker and peer
+//! handles epoll event loop
+//! triggers peer tracker, p2p, strategy, on a timer
 
 mod p2p;
 mod peers;
@@ -14,6 +18,7 @@ use std::net::{self, SocketAddrV4, Ipv4Addr};
 use clap::Parser;
 
 use crate::peers::Peers;
+use crate::torrent::parse_torrent_file;
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -27,7 +32,7 @@ struct Args {
     #[arg(short, long)]
     file: String,
 }
-
+/// main handles the initialization of stuff and keeping the event loop logic going
 fn main() {
 
     // you'll never guess what this line does
@@ -46,7 +51,10 @@ fn main() {
     // registers our listening socket in the epoll
     poll.registry().register(&mut serv_sock, SERVER, Interest::READABLE).expect("serv register failed");
 
-    // TODO: read in torrent file, ask tracker.rs to talk with tracker
+    // read in torrent file 
+    parse_torrent_file(&args.file);
+
+    // TODO: ask tracker.rs to talk with tracker
 
     loop {
         poll.poll(&mut events, None).expect("poll_wait failed");
@@ -61,7 +69,7 @@ fn main() {
                 }
                 token => {
                     if let Some(socket) = sockets.get(&token) {
-                        handle_peer_response(&socket);
+                        handle_peer(&socket);
                     } else {
                         println!("there is no socket associated with token {:#?}", token);
                     }
@@ -88,7 +96,8 @@ fn main() {
     }
 }
 
-fn handle_tracker_response() -> () {
+/// handles the response the tracker got, creates new peers for all the peers it received if needed
+fn handle_tracker_response() {
     //     get "list" of peer metadata
 
     //     foreach peer data {
@@ -107,6 +116,7 @@ fn handle_tracker_response() -> () {
     //     }
 }
 
-fn handle_peer_response(socket: &TcpStream) {
+/// handles the message it got from a peer
+fn handle_peer(socket: &TcpStream) {
 
 }
