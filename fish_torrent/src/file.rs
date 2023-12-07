@@ -23,7 +23,8 @@ fn init_file(name: &str, piece_size: usize) {
         .expect("wow");
 
     //Space allocation
-    file.seek(SeekFrom::Start(piece_size.try_into().unwrap())).unwrap();
+    file.seek(SeekFrom::Start(piece_size.try_into().unwrap()))
+        .unwrap();
     file.write_all(&[0]).unwrap();
     file.seek(SeekFrom::Start(0)).unwrap();
 
@@ -33,7 +34,7 @@ fn init_file(name: &str, piece_size: usize) {
     }
 }
 // we just recieved a block, figure out what to do with it
-fn write_block(index: usize, begin: usize, block: Vec<u8>){
+fn write_block(index: usize, begin: usize, block: Vec<u8>) {
     unsafe {
         if let Some(file) = &mut FILE {
             if let Some(size) = SIZE {
@@ -46,7 +47,7 @@ fn write_block(index: usize, begin: usize, block: Vec<u8>){
 }
 
 // we just recieved a request for a block, read it and send it out too?
-fn read_block(){}
+fn read_block() {}
 
 #[cfg(test)]
 mod test {

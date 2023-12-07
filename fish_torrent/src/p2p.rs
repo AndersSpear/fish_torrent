@@ -6,9 +6,9 @@ use super::peers::Peer;
 use super::torrent;
 use bitvec::prelude::*;
 
-use std::io::Write;
+use mio::net::TcpStream;
 use std::io::Error;
-use mio::net::{TcpStream};
+use std::io::Write;
 
 pub struct Message<'a> {
     // TODO: Some information about peer
@@ -52,7 +52,7 @@ pub enum MessageType {
 }
 
 // called when socket triggers, pass in a peer that got triggered
-pub fn handle_message<'a>(peer: &'a mut Peer) -> Message<'a> {  
+pub fn handle_message<'a>(peer: &'a mut Peer) -> Message<'a> {
     unimplemented!();
     //let msg: Message<'a> = get_message(peer);
 
@@ -70,7 +70,6 @@ fn recv_message<'a>(sockfd: u32) -> Message<'a> {
     //see if its a new handshake, a handshakr response
     //if its a handshake response, return a handshake response message
     //if its a message, return a message
-
 }
 
 // TODO: Another way to implement the above is an associated function/method
@@ -93,51 +92,76 @@ fn handle_choke(msg: &Message) {
 
 /// can handle sending any type of message
 /// queues in some sort of send list
-pub fn send_message(msg: Message) -> Result<(), Error>{
+pub fn send_message(msg: Message) -> Result<(), Error> {
     // <length prefix><message ID><payload>
     // 4 bytes        1 byte      ? bytes
 
-    let sock:&mut TcpStream = msg.peer.get_socket();
+    let sock: &mut TcpStream = msg.peer.get_socket();
 
     match msg.m_type {
-        MessageType::Choke => {send_len_id(sock, 1, 0)?;},
-        MessageType::Unchoke => {send_len_id(sock, 1, 1)?;},
-        MessageType::Interested => {send_len_id(sock, 1, 2)?;},
-        MessageType::NotInterested => {send_len_id(sock, 1, 3)?;},
-        MessageType::Have { index } => {send_have(sock, index)?;},
-        MessageType::Bitfield { field } => {send_bitfield(sock, field)?;},
+        MessageType::Choke => {
+            send_len_id(sock, 1, 0)?;
+        }
+        MessageType::Unchoke => {
+            send_len_id(sock, 1, 1)?;
+        }
+        MessageType::Interested => {
+            send_len_id(sock, 1, 2)?;
+        }
+        MessageType::NotInterested => {
+            send_len_id(sock, 1, 3)?;
+        }
+        MessageType::Have { index } => {
+            send_have(sock, index)?;
+        }
+        MessageType::Bitfield { field } => {
+            send_bitfield(sock, field)?;
+        }
         MessageType::Request {
             index,
             begin,
             length,
-        } => {send_request_or_cancel(sock, true, index, begin, length)?;},
+        } => {
+            send_request_or_cancel(sock, true, index, begin, length)?;
+        }
         MessageType::Piece {
             index,
             begin,
             block,
-        } => {send_piece(sock, index, begin, block)?;},
+        } => {
+            send_piece(sock, index, begin, block)?;
+        }
         MessageType::Cancel {
             index,
             begin,
             length,
-        } => {send_request_or_cancel(sock, false, index, begin, length)?;},
-        MessageType::KeepAlive => {sock.write_all(&[0; 4])?;},
-        MessageType::Undefined => {return Err(Error::new(std::io::ErrorKind::Other, "Undefined message type"))},
+        } => {
+            send_request_or_cancel(sock, false, index, begin, length)?;
+        }
+        MessageType::KeepAlive => {
+            sock.write_all(&[0; 4])?;
+        }
+        MessageType::Undefined => {
+            return Err(Error::new(
+                std::io::ErrorKind::Other,
+                "Undefined message type",
+            ))
+        }
         MessageType::HandshakeResponse => send_handshake(sock)?,
     }
     Ok(())
 }
 
-fn send_len_id(sock: &mut TcpStream, len: u32, id: u8) -> Result<(), Error>{
-    let mut buf = vec![0;5];
+fn send_len_id(sock: &mut TcpStream, len: u32, id: u8) -> Result<(), Error> {
+    let mut buf = vec![0; 5];
     buf[0..4].copy_from_slice(&len.to_be_bytes());
     buf[4] = id;
     sock.write_all(&buf)?;
     Ok(())
 }
 
-fn send_have(sock: &mut TcpStream, index: usize) -> Result<(), Error>{
-    let mut buf = vec![0;9];
+fn send_have(sock: &mut TcpStream, index: usize) -> Result<(), Error> {
+    let mut buf = vec![0; 9];
     buf[0..4].copy_from_slice(&9_u32.to_be_bytes());
     buf[4] = 4; // message id 4 is have
     buf[5..9].copy_from_slice(&index.to_be_bytes());
@@ -145,14 +169,14 @@ fn send_have(sock: &mut TcpStream, index: usize) -> Result<(), Error>{
     Ok(())
 }
 
-fn send_bitfield(sock: &mut TcpStream, field: BitVec<u8>) -> Result<(), Error>{
+fn send_bitfield(sock: &mut TcpStream, field: BitVec<u8>) -> Result<(), Error> {
     // TODO make sure length is in bytes not bits
     let length = field.len() as usize;
 
     // TODO make sure the into_vec is byte aligned and end is padded with 0s
     //field.force_align();
-    
-    let mut buf = vec![0;5];
+
+    let mut buf = vec![0; 5];
     buf[0..4].copy_from_slice(&(length + 1).to_be_bytes());
     buf[4] = 5; // message id 5 is bitfield
     buf.extend(field.into_vec());
@@ -161,10 +185,16 @@ fn send_bitfield(sock: &mut TcpStream, field: BitVec<u8>) -> Result<(), Error>{
 }
 
 /// if second argument is true, send a request, else send a cancel
-fn send_request_or_cancel(sock: &mut TcpStream, is_request_message: bool, index: usize, begin: usize, length: usize) -> Result<(), Error>{
-    let mut buf = vec![0;17];
+fn send_request_or_cancel(
+    sock: &mut TcpStream,
+    is_request_message: bool,
+    index: usize,
+    begin: usize,
+    length: usize,
+) -> Result<(), Error> {
+    let mut buf = vec![0; 17];
     buf[0..4].copy_from_slice(&13_u32.to_be_bytes());
-    buf[4] = if is_request_message {6} else {8}; // message id 6 is request, 8 is cancel
+    buf[4] = if is_request_message { 6 } else { 8 }; // message id 6 is request, 8 is cancel
     buf[5..9].copy_from_slice(&index.to_be_bytes());
     buf[9..13].copy_from_slice(&begin.to_be_bytes());
     buf[13..17].copy_from_slice(&length.to_be_bytes());
@@ -172,10 +202,15 @@ fn send_request_or_cancel(sock: &mut TcpStream, is_request_message: bool, index:
     Ok(())
 }
 
-fn send_piece(sock: &mut TcpStream, index: usize, begin: usize, block: Vec<u8>) -> Result<(), Error>{
+fn send_piece(
+    sock: &mut TcpStream,
+    index: usize,
+    begin: usize,
+    block: Vec<u8>,
+) -> Result<(), Error> {
     let length = block.len() as usize;
 
-    let mut buf = vec![0;13];
+    let mut buf = vec![0; 13];
     buf[0..4].copy_from_slice(&(length + 9).to_be_bytes());
     buf[4] = 7; // message id 7 is piece
     buf[5..9].copy_from_slice(&index.to_be_bytes());
@@ -187,7 +222,7 @@ fn send_piece(sock: &mut TcpStream, index: usize, begin: usize, block: Vec<u8>) 
 
 /// called right after we created a new peer
 /// sends the initial handshake
-pub fn send_handshake(sock: &mut TcpStream)-> Result<(), Error> {
+pub fn send_handshake(sock: &mut TcpStream) -> Result<(), Error> {
     let mut buf: Vec<u8> = vec![0; 68];
     buf[0] = 19;
     buf[1..20].copy_from_slice(b"BitTorrent protocol");

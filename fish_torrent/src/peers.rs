@@ -6,8 +6,8 @@
 use bitvec::prelude::*;
 use std::collections::HashMap;
 
-use std::net::Shutdown;
 use mio::net::TcpStream;
+use std::net::Shutdown;
 
 #[derive(Debug)]
 pub struct Peer {
@@ -65,7 +65,9 @@ pub struct Peers {
 
 impl Peers {
     pub fn new() -> Self {
-        Peers { list: HashMap::new() }
+        Peers {
+            list: HashMap::new(),
+        }
     }
 
     pub fn add_peer(&mut self, peer: Peer) -> bool {

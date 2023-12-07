@@ -7,16 +7,16 @@
 //! handles epoll event loop
 //! triggers peer tracker, p2p, strategy, on a timer
 
+mod file;
 mod p2p;
 mod peers;
 mod torrent;
-mod file;
 
-use mio::{Events, Poll, Interest, Token};
-use mio::net::{TcpStream, TcpListener};
-use std::collections::HashMap;
-use std::net::{self, SocketAddrV4, Ipv4Addr};
 use clap::Parser;
+use mio::net::{TcpListener, TcpStream};
+use mio::{Events, Interest, Poll, Token};
+use std::collections::HashMap;
+use std::net::{self, Ipv4Addr, SocketAddrV4};
 
 use crate::peers::Peers;
 use crate::torrent::parse_torrent_file;
@@ -35,24 +35,29 @@ struct Args {
 }
 /// main handles the initialization of stuff and keeping the event loop logic going
 fn main() {
-
     // you'll never guess what this line does
     let args = Args::parse();
     let mut peer_list = Peers::new();
     let mut sockets: HashMap<Token, TcpStream> = HashMap::new();
 
     // binds to INADDR_ANY
-    let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, args.port))).expect("bind failed");
-    const SERVER:Token = Token(0);
+    let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(
+        Ipv4Addr::UNSPECIFIED,
+        args.port,
+    )))
+    .expect("bind failed");
+    const SERVER: Token = Token(0);
 
     // creates the events and poll instance used by the event loop
     let mut events = Events::with_capacity(727);
     let mut poll = Poll::new().expect("poll failed");
-    
-    // registers our listening socket in the epoll
-    poll.registry().register(&mut serv_sock, SERVER, Interest::READABLE).expect("serv register failed");
 
-    // read in torrent file 
+    // registers our listening socket in the epoll
+    poll.registry()
+        .register(&mut serv_sock, SERVER, Interest::READABLE)
+        .expect("serv register failed");
+
+    // read in torrent file
     parse_torrent_file(&args.file);
 
     // TODO: ask tracker.rs to talk with tracker
@@ -118,6 +123,4 @@ fn handle_tracker_response() {
 }
 
 /// handles the message it got from a peer
-fn handle_peer(socket: &TcpStream) {
-
-}
+fn handle_peer(socket: &TcpStream) {}
