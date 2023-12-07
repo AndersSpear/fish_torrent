@@ -5,6 +5,17 @@
 mod peers;
 mod p2p;
 
+use mio::{Events, Poll, Interest, Token};
+use mio::net::TcpStream
+use stl::net::{self, SocketAddr};
+
+fn main() {
+
+    // set up the server addr
+    // TODO: read in torrent file, ask tracker.rs to talk with tracker
+    //
+    // set up the initial poll
+
 // loop{
 //     epollwait();
 //     for(events){
@@ -19,9 +30,4 @@ mod p2p;
 //         }
 //     }
 // }
-
-
-fn main() {
-
-    println!("Hello, world!");
 }
