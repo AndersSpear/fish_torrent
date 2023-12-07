@@ -5,20 +5,14 @@
 // updates which peers we are communicating with
 use bitvec::prelude::*;
 use std::collections::HashMap;
-use std::sync::LazyLock;
-use std::sync::RwLock;
 
 use std::net::Shutdown;
-use std::net::SocketAddrV4;
 use std::net::TcpStream;
-
-static PEER_LIST: LazyLock<RwLock<HashMap<[u8; 20], Peer>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Debug)]
 pub struct Peer {
     peer_id: [u8; 20],
-    socket: TcpStream, //TODO ???
+    socket: TcpStream,
     am_choking: bool,
     am_interested: bool,
     peer_choking: bool,
@@ -28,46 +22,20 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub fn new(peer_id: [u8; 20], addr: SocketAddrV4) -> Option<Self> {
-        if let Ok(socket) = TcpStream::connect(&addr) {
-            Some(Self {
-                peer_id,
-                socket,
-                am_choking: true,
-                am_interested: false,
-                peer_choking: true,
-                peer_interested: false,
-                piece_bitmap: BitVec::new(),
-                interested_bitmap: BitVec::new(),
-            })
-        } else {
-            None
+    pub fn new(peer_id: [u8; 20], socket: TcpStream) -> Self {
+        Self {
+            peer_id,
+            socket,
+            am_choking: true,
+            am_interested: false,
+            peer_choking: true,
+            peer_interested: false,
+            piece_bitmap: BitVec::new(),
+            interested_bitmap: BitVec::new(),
         }
     }
 
-    pub fn add_peer(self) {
-        if PEER_LIST
-            .read()
-            .expect("RwLock on PEER_LIST was poisoned.")
-            .get(&self.peer_id)
-            == None
-        {
-            PEER_LIST
-                .write()
-                .expect("RwLock on PEER_LIST was poisoned.")
-                .insert(self.peer_id, self);
-        }
-    }
-
-    pub fn remove_peer(&self) {
-        self.disconnect_peer();
-        PEER_LIST
-            .write()
-            .expect("RwLock on PEER_LIST was poisoned.")
-            .remove(&self.peer_id);
-    }
-
-    pub fn disconnect_peer(&self) {
+    pub fn disconnect(&self) {
         self.socket
             .shutdown(Shutdown::Both)
             .expect(format!("Connection to {:?} failed", self.socket).as_str());
@@ -91,10 +59,30 @@ impl PartialEq for Peer {
     }
 }
 
-pub fn find_peer(peer_id: &[u8; 20]) -> Option<&Peer> {
-    PEER_LIST.read().expect("RwLock on PEER_LIST was poisoned.").get(peer_id)
+pub struct Peers {
+    list: HashMap<[u8; 20], Peer>,
 }
 
-pub fn get_peer_list() -> &'static HashMap<[u8; 20], Peer> {
-    &PEER_LIST.read().expect("RwLock on PEER_LIST was poisoned.")
+impl Peers {
+    pub fn new() -> Self {
+        Peers { list: HashMap::new() }
+    }
+
+    pub fn add_peer(&mut self, peer: Peer) -> bool {
+        if self.list.get(&peer.peer_id) == None {
+            self.list.insert(peer.peer_id, peer);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn remove_peer(&mut self, peer: Peer) {
+        peer.disconnect();
+        self.list.remove(&peer.peer_id);
+    }
+
+    pub fn find_peer(&self, peer_id: [u8; 20]) -> Option<&Peer> {
+        self.list.get(&peer_id)
+    }
 }
