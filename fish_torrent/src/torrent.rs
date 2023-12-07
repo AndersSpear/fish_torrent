@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unreachable_code)]
 #![warn(missing_docs)]
 //! parses the .torrent file
 //!
@@ -42,7 +44,7 @@ impl FromBencode for Torrent {
 
     fn decode_bencode_object(object: Object) -> Result<Self, Error> {
         unimplemented!("Torrent::decode_bencode_object");
-        
+
         let mut announce = None;
         let mut info_hash = None;
         let mut piece_length = None;
