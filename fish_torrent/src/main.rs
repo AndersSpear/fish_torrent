@@ -9,10 +9,13 @@ mod torrent;
 
 use mio::{Events, Poll, Interest, Token};
 use mio::net::{TcpStream, TcpListener};
+use std::collections::HashMap;
 use std::net::{self, SocketAddrV4, Ipv4Addr};
 use clap::Parser;
 
-/// Takes in the port and torrent file
+use crate::peers::Peers;
+
+// Takes in the port and torrent file
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -29,24 +32,40 @@ fn main() {
 
     // you'll never guess what this line does
     let args = Args::parse();
-    
+    let mut peer_list = Peers::new();
+    let mut sockets: HashMap<Token, TcpStream> = HashMap::new();
+
     // binds to INADDR_ANY
     let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, args.port))).expect("bind failed");
     const SERVER:Token = Token(0);
 
-    let mut events = Events::with_capacity(1024);
-    let mut poll = mio::Poll::new().expect("poll failed");
-    poll.registry().register(&mut serv_sock, Token(0), Interest::READABLE).expect("serv register failed");
+    // creates the events and poll instance used by the event loop
+    let mut events = Events::with_capacity(727);
+    let mut poll = Poll::new().expect("poll failed");
+    
+    // registers our listening socket in the epoll
+    poll.registry().register(&mut serv_sock, SERVER, Interest::READABLE).expect("serv register failed");
 
     // TODO: read in torrent file, ask tracker.rs to talk with tracker
-    // TODO: set up the initial poll
 
     loop {
         poll.poll(&mut events, None).expect("poll_wait failed");
 
         for event in &events {
-            if event.token() == Token(0) {
-                println!("an accept occurred!");
+            match event.token() {
+                SERVER => {
+                    println!("an accept occurred!");
+                }
+                TRACKER => {
+                    handle_tracker_response();
+                }
+                token => {
+                    if let Some(socket) = sockets.get(&token) {
+                        handle_peer_response(&socket);
+                    } else {
+                        println!("there is no socket associated with token {:#?}", token);
+                    }
+                }
             }
         }
         // match listener.accept() {
@@ -67,4 +86,27 @@ fn main() {
         //     }
         // }
     }
+}
+
+fn handle_tracker_response() -> () {
+    //     get "list" of peer metadata
+
+    //     foreach peer data {
+
+    //         let mut socket = TcpStream::connect(peer data)?;
+    //         let peer = Peer::new(peerid, stream);
+
+    //         if peer_list.add_peer(peer) == false {
+
+    //             error or seomthign idk
+    //         }
+
+    //         let token = get_new_token();
+    //         poll.registry().register(&mut socket, token, Interest::READABLE)?;
+    //         sockets.insert(get_new_token, peer_list.find_peer(peerid).unwrap().get_socket());
+    //     }
+}
+
+fn handle_peer_response(socket: &TcpStream) {
+
 }
