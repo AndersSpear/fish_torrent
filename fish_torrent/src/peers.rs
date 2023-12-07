@@ -7,7 +7,7 @@ use bitvec::prelude::*;
 use std::collections::HashMap;
 
 use std::net::Shutdown;
-use std::net::TcpStream;
+use mio::net::TcpStream;
 
 #[derive(Debug)]
 pub struct Peer {

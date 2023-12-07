@@ -28,6 +28,20 @@ struct Torrent {
     name: String, // name of the file, name of the suggested directory if multiple file mode
 }
 
+struct File {
+    length: u32, // length of the file in bytes
+    path: Vec<String>, // list of UTF-8 encoded strings corresponding to subdirectory names, the last element is the file name
+}
+
+struct MultiFileTorrent {
+    announce: String,      // url of the tracker
+    info_hash: Vec<u8>,    // 20 byte SHA1 hash value of info dictionary
+    piece_length: u32,     // number of bytes per piece
+    files: Vec<File>,      // list of files
+    pieces: Vec<Vec<u8>>,  // 20 byte SHA1 hash value of each piece, the files are concatenated in the order they appear in the files list, will need to split based on file length
+    name: String, // name of the file, name of the suggested directory if multiple file mode
+}
+
 /// Parses the .torrent file
 /// unsafe because it modifies a static variable
 pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
