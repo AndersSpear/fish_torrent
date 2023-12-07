@@ -69,7 +69,11 @@ fn main() {
         for event in &events {
             match event.token() {
                 SERVER => {
-                    println!("an accept occurred!");
+                    if let Ok((socket, addr)) = serv_sock.accept() {
+                        println!("new client: {addr:?}");
+                    } else {
+                        println!("couldn't get client");
+                    }
                 }
                 TRACKER => {
                     handle_tracker_response();
