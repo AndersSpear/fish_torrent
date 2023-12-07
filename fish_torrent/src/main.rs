@@ -10,6 +10,7 @@
 mod p2p;
 mod peers;
 mod torrent;
+mod file;
 
 use mio::{Events, Poll, Interest, Token};
 use mio::net::{TcpStream, TcpListener};
