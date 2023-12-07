@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 bitvec = "1.0.1"
 urlencoding = "2.1.3"
-mio = "0.8"
+mio = { version = "0.8", features = ["os-poll", "net", "os-ext"] }
 bendy = "^0.3"
 clap = { version = "4.4.11", features = ["derive"] }

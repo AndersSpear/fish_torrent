@@ -5,10 +5,10 @@
 
 // mod p2p;
 mod peers;
-mod torrent;
 
 use mio::{Events, Poll, Interest, Token};
-use std::net::{self, SocketAddr};
+use mio::net::{TcpStream, TcpListener};
+use std::net::{self, SocketAddrV4, Ipv4Addr};
 use clap::Parser;
 
 /// Takes in the port and torrent file
@@ -28,24 +28,42 @@ fn main() {
 
     // you'll never guess what this line does
     let args = Args::parse();
+    
+    // binds to INADDR_ANY
+    let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, args.port))).expect("bind failed");
+    const SERVER:Token = Token(0);
 
-    // set up the server addr
+    let mut events = Events::with_capacity(1024);
+    let mut poll = mio::Poll::new().expect("poll failed");
+    poll.registry().register(&mut serv_sock, Token(0), Interest::READABLE).expect("serv register failed");
+
     // TODO: read in torrent file, ask tracker.rs to talk with tracker
-    //
-    // set up the initial poll
+    // TODO: set up the initial poll
 
-// loop{
-//     epollwait();
-//     for(events){
-//         if(tracker_interval){
-//             update_tracker();
-//         }
-//         if(tracker_response){
-//             handle_tracker_response();
-//         }
-//         if(peer_response){
-//             handle_peer_response();
-//         }
-//     }
-// }
+    loop {
+        poll.poll(&mut events, None).expect("poll_wait failed");
+
+        for event in &events {
+            if event.token() == Token(0) {
+                println!("an accept occurred!");
+            }
+        }
+        // match listener.accept() {
+        //     Ok((_socket, addr)) => println!("new client: {addr:?}"),
+        //     Err(e) => println!("couldn't get client: {e:?}"),
+        // }
+
+        // epollwait();
+        // for(events) {
+        //     if(tracker_interval){
+        //         update_tracker();
+        //     }
+        //     if(tracker_response){
+        //         handle_tracker_response();
+        //     }
+        //     if(peer_response){
+        //         handle_peer_response();
+        //     }
+        // }
+    }
 }
