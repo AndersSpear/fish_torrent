@@ -3,8 +3,8 @@
 // handles epoll event loop
 // triggers peer tracker, p2p, strategy, on a timer
 
-mod peers;
 mod p2p;
+mod peers;
 
 // loop{
 //     epollwait();
@@ -21,8 +21,6 @@ mod p2p;
 //     }
 // }
 
-
 fn main() {
-
     println!("Hello, world!");
 }

@@ -1,16 +1,16 @@
-#![allow(dead_code)] 
+#![allow(dead_code)]
 #![warn(missing_docs)]
 
 // sending and recieving from peers
 use super::peers::Peer;
 use bitvec::prelude::*;
-use std::net::TcpStream;
 use std::io::Write;
+use std::net::TcpStream;
 
 pub struct Message<'a> {
     // TODO: Some information about peer
     peer: &'a Peer,
-    m_type: MessageType
+    m_type: MessageType,
 }
 
 // A little added enum with associated data structs from Tien :)
@@ -22,36 +22,50 @@ pub enum MessageType {
     Unchoke,
     Interested,
     NotInterested,
-    Have {index: usize},
-    Bitfield {field: BitVec}, // BitVec is a bitvector from the bitvec crate
-    Request {index: usize, begin: usize, length: usize},
-    Piece {index: usize, begin: usize, block: Vec<u8>},
-    Cancel {index: usize, begin: usize, length: usize},
+    Have {
+        index: usize,
+    },
+    Bitfield {
+        field: BitVec,
+    }, // BitVec is a bitvector from the bitvec crate
+    Request {
+        index: usize,
+        begin: usize,
+        length: usize,
+    },
+    Piece {
+        index: usize,
+        begin: usize,
+        block: Vec<u8>,
+    },
+    Cancel {
+        index: usize,
+        begin: usize,
+        length: usize,
+    },
     KeepAlive, // KeepAlive is last because it does not have an associated
-              // id in the protocol. This way choke starts at id 0.
+    // id in the protocol. This way choke starts at id 0.
     //Port // DHT Tracker is not supported, so this msg is not handled.
     Undefined,
     HandshakeResponse,
 }
 
-
-
 // called when socket triggers, pass in a peer that got triggered
-pub fn handle_message<'a>(peer: &'a Peer) -> Message<'a>{
+pub fn handle_message<'a>(peer: &'a Peer) -> Message<'a> {
     //let msg: Message<'a> = get_message(peer);
 
     //read the message into a buffer
-    //see if its a new handshake, a handshakr response 
+    //see if its a new handshake, a handshakr response
 
     Message {
         peer: peer,
-        m_type: MessageType::Undefined
+        m_type: MessageType::Undefined,
     }
 }
 
 // fn recv_message(sockfd: u32) -> Message<'a> {
 //     //read the message into a buffer
-//     //see if its a new handshake, a handshakr response 
+//     //see if its a new handshake, a handshakr response
 //     //if its a handshake response, return a handshake response message
 //     //if its a message, return a message
 
@@ -81,7 +95,7 @@ fn send_message(msg: Message) {}
 // sends the initial handshake
 pub fn send_handshake(peer: &Peer) {
     let sock: &mut TcpStream = peer.get_socket();
-    let mut buf: Vec<u8> = vec![0;68];
+    let mut buf: Vec<u8> = vec![0; 68];
     buf[0] = 19;
     buf[1..20].copy_from_slice(b"BitTorrent protocol");
     buf[28..48].copy_from_slice(&super::torrent::get_info_hash());
