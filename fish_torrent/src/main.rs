@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddrV4};
 
 use crate::peers::Peers;
-use crate::torrent::parse_torrent_file;
+use crate::torrent::{parse_torrent_file};
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -57,9 +57,10 @@ fn main() {
         .register(&mut serv_sock, SERVER, Interest::READABLE)
         .expect("serv register failed");
 
-    // read in torrent file
-    parse_torrent_file(&args.file);
+    // read in torrent file 
+    parse_torrent_file(&args.file).expect("Failed to parse torrent file");
 
+    // println!("{}", get_tracker_url());
     // TODO: ask tracker.rs to talk with tracker
 
     loop {

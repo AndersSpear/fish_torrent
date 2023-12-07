@@ -6,6 +6,8 @@
 //!
 
 use bendy::decoding::{Error, FromBencode, Object};
+use bendy::serde::{from_bytes};
+use serde::{Deserialize, Serialize};
 use std::fs::read;
 
 static mut TORRENT: Torrent = Torrent {
@@ -18,6 +20,7 @@ static mut TORRENT: Torrent = Torrent {
     name: String::new(),
 };
 
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Torrent {
     announce: String,      // url of the tracker
     info_hash: Vec<u8>,    // 20 byte SHA1 hash value of info dictionary
@@ -26,6 +29,23 @@ struct Torrent {
     pieces: Vec<Vec<u8>>,  // 20 byte SHA1 hash value of each piece
     length: u32,           // number of bytes of the file
     name: String, // name of the file, name of the suggested directory if multiple file mode
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct Info {
+    length: u32,           // number of bytes of the file
+    name: String, // name of the file, name of the suggested directory if multiple file mode
+    #[serde(rename = "piece length")]
+    piece_length: u32,     // number of bytes per piece
+    #[serde(with = "serde_bytes")]
+    pieces: Vec<u8>,  // 20 byte SHA1 hash value of each piece
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+struct Torrent2 {
+    announce: String,      // url of the tracker
+    encoding: String,      // url of the tracker
+    info: Info,
 }
 
 struct File {
@@ -46,9 +66,13 @@ struct MultiFileTorrent {
 /// unsafe because it modifies a static variable
 pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
     let contents: Vec<u8> = read(filename)?;
-    unsafe {
-        TORRENT = Torrent::from_bencode(&contents)?;
-    }
+    let ret = from_bytes::<Torrent2>(contents.as_slice())?;
+
+    println!("announce: {}", ret.announce);
+    println!("length: {}", ret.info.length);
+    println!("name: {}", ret.info.name);
+    println!("piece length: {}", ret.info.piece_length);
+    println!("pieces vec: {:?}", ret.info.pieces);
     Ok(())
 }
 
