@@ -1,13 +1,14 @@
+#![feature(lazy_cell)]
 // handles initial call to tracker and peer
 // handles epoll event loop
 // triggers peer tracker, p2p, strategy, on a timer
 
-mod peers;
 mod p2p;
+mod peers;
 
 use mio::{Events, Poll, Interest, Token};
 use mio::net::TcpStream
-use stl::net::{self, SocketAddr};
+use std::net::{self, SocketAddr};
 
 fn main() {
 
