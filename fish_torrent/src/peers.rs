@@ -46,6 +46,22 @@ impl Peer {
     pub fn get_socket(&mut self) -> &mut TcpStream {
         &mut self.socket
     }
+
+    pub fn set_piece_bitmap(&mut self, index: usize) {
+        self.piece_bitmap.set(index, true);
+    }
+
+    pub fn unset_piece_bitmap(&mut self, index: usize) {
+        self.piece_bitmap.set(index, false);
+    }
+
+    pub fn set_interested_bitmap(&mut self, index: usize) {
+        self.interested_bitmap.set(index, true);
+    }
+
+    pub fn unset_interested_bitmap(&mut self, index: usize) {
+        self.interested_bitmap.set(index, false);
+    }
 }
 
 impl PartialEq for Peer {

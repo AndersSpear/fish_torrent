@@ -1,0 +1,11 @@
+{"announce" => "http:..."
+ "announce_list" => [["http:..."]
+		            ["http:..."]]
+ "created by" => "Transmission..."
+ "creation date" => 1701713706
+ "encoding" => "UTF-8"
+ "info" => {"length" => 63371
+            "name" => "artofwar.txt"
+            "piece length" => 32768
+            "pieces" => "tK..."
+            "private" => 0}}
