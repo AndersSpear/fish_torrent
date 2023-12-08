@@ -19,6 +19,7 @@ pub struct Peer {
     peer_interested: bool,
     piece_bitmap: BitVec,
     interested_bitmap: BitVec,
+    recv_buffer: Vec<u8>,
 }
 
 impl Peer {
@@ -32,6 +33,7 @@ impl Peer {
             peer_interested: false,
             piece_bitmap: BitVec::new(),
             interested_bitmap: BitVec::new(),
+            recv_buffer: Vec::new(),
         }
     }
 
@@ -56,6 +58,7 @@ impl PartialEq for Peer {
             && self.peer_interested == other.peer_interested
             && self.piece_bitmap == other.piece_bitmap
             && self.interested_bitmap == other.interested_bitmap
+            // anders - i did not add recv_buffer to this because fuck that
     }
 }
 

@@ -10,10 +10,10 @@ use mio::net::TcpStream;
 use std::io::Error;
 use std::io::Write;
 
-pub struct Message<'a> {
+pub struct Messages<'a> {
     // TODO: Some information about peer
     peer: &'a mut Peer,
-    m_type: MessageType,
+    messages: Vec<MessageType>,
 }
 
 /// A little added enum with associated data structs from Tien :)
@@ -47,24 +47,23 @@ pub enum MessageType {
     KeepAlive, // KeepAlive is last because it does not have an associated
     // id in the protocol. This way choke starts at id 0.
     //Port // DHT Tracker is not supported, so this msg is not handled.
-    Undefined,
-    HandshakeResponse,
+    Handshake,
 }
 
 // called when socket triggers, pass in a peer that got triggered
-pub fn handle_message<'a>(peer: &'a mut Peer) -> Message<'a> {
+pub fn handle_messages<'a>(peer: &'a mut Peer) -> Messages<'a> {
     unimplemented!();
     //let msg: Message<'a> = get_message(peer);
 
     //read the message into a buffer
     //see if its a new handshake, a handshakr response
-    Message {
+    Messages {
         peer: peer,
-        m_type: MessageType::Undefined,
+        messages: Vec::new(),
     }
 }
 
-fn recv_message<'a>(sockfd: u32) -> Message<'a> {
+fn recv_message<'a>(sockfd: u32) -> Messages<'a> {
     unimplemented!();
     //read the message into a buffer
     //see if its a new handshake, a handshakr response
@@ -86,19 +85,25 @@ fn recv_message<'a>(sockfd: u32) -> Message<'a> {
 // }
 
 /// if we get chcked, make sure to remove the send buffer for that person
-fn handle_choke(msg: &Message) {
+fn handle_choke(msg: &Messages) {
     unimplemented!();
 }
 
 /// can handle sending any type of message
 /// queues in some sort of send list
-pub fn send_message(msg: Message) -> Result<(), Error> {
+pub fn send_messages(msgs: Messages) -> Result<(), Error> {
     // <length prefix><message ID><payload>
     // 4 bytes        1 byte      ? bytes
 
-    let sock: &mut TcpStream = msg.peer.get_socket();
+    let sock: &mut TcpStream = msgs.peer.get_socket();
+    for msg in msgs.messages {
+        send_message_type(sock, msg)?;
+    }
+    Ok(())
+}
 
-    match msg.m_type {
+fn send_message_type(sock: &mut TcpStream, msg: MessageType) -> Result<(), Error> {
+    match msg {
         MessageType::Choke => {
             send_len_id(sock, 1, 0)?;
         }
@@ -141,13 +146,7 @@ pub fn send_message(msg: Message) -> Result<(), Error> {
         MessageType::KeepAlive => {
             sock.write_all(&[0; 4])?;
         }
-        MessageType::Undefined => {
-            return Err(Error::new(
-                std::io::ErrorKind::Other,
-                "Undefined message type",
-            ))
-        }
-        MessageType::HandshakeResponse => send_handshake(sock)?,
+        MessageType::Handshake => send_handshake(sock)?,
     }
     Ok(())
 }
