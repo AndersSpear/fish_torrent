@@ -60,7 +60,7 @@ fn main() {
         .register(&mut serv_sock, SERVER, Interest::READABLE)
         .expect("serv register failed");
 
-    // read in torrent file 
+    // read in torrent file
     parse_torrent_file(&args.file).expect("Failed to parse torrent file");
 
     // uh ill fix this ignore for now

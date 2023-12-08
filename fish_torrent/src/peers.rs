@@ -74,7 +74,7 @@ impl PartialEq for Peer {
             && self.peer_interested == other.peer_interested
             && self.piece_bitmap == other.piece_bitmap
             && self.interested_bitmap == other.interested_bitmap
-            // anders - i did not add recv_buffer to this because fuck that
+        // anders - i did not add recv_buffer to this because fuck that
     }
 }
 

@@ -5,11 +5,11 @@
 //! parses the .torrent file
 //!
 
-use bendy::decoding::Error;
+use bendy::decoding::{Decoder, DictDecoder, Error, Object};
 use bendy::serde::from_bytes;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
 use std::fs::read;
-use sha1::{Sha1, Digest};
 
 static mut TORRENT: Torrent = Torrent {
     announce: String::new(),
@@ -32,32 +32,33 @@ pub enum TorrentMode {
 }
 
 impl Default for TorrentMode {
-    fn default() -> Self { TorrentMode::SingleFile }
+    fn default() -> Self {
+        TorrentMode::SingleFile
+    }
 }
 
 /// main torrent struct, is initilalized during parse_torrent_file
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Torrent {
-    announce: String,      // url of the tracker (http or udp)
+    announce: String, // url of the tracker (http or udp)
     info: Info,
 
     //non-encoded info, computed by me
     #[serde(default)]
-    info_hash: Vec<u8>,    // 20 byte SHA1 hashvalue of the swarm
+    info_hash: Vec<u8>, // 20 byte SHA1 hashvalue of the swarm
     #[serde(default)]
     torrent_mode: TorrentMode, // single file or multiple file mode
 }
 
-
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Info {
     #[serde(default)]
-    length: u32,           // number of bytes of the file
+    length: u32, // number of bytes of the file
     name: String, // name of the file, name of the suggested directory if multiple file mode
     #[serde(rename = "piece length")]
-    piece_length: u32,     // number of bytes per piece
+    piece_length: u32, // number of bytes per piece
     #[serde(with = "serde_bytes")]
-    pieces: Vec<u8>,  // 20 byte SHA1 hash value of each piece, the files are concatenated in the order they appear in the files list, will need to split based on file length
+    pieces: Vec<u8>, // 20 byte SHA1 hash value of each piece, the files are concatenated in the order they appear in the files list, will need to split based on file length
     #[serde(default)]
     files: Vec<File>,
 }
@@ -68,34 +69,36 @@ struct File {
     path: Vec<String>, // list of UTF-8 encoded strings corresponding to subdirectory names, the last element is the file name
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-struct InfoHashStruct{
-    #[serde(alias = "info")]
-    #[serde(deserialize_with = "set_info_hash")]
-    info_hash: Vec<u8>,
-}
-
-pub fn set_info_hash<'de, D>(d: Deserializer<'de>) -> Result<Vec<u8>, Error> {
-    let mut hasher = Sha1::new();
-    hasher.update(d.into_bytes()?);
-    let result = hasher.finalize();
-    Ok(vec!(result))
-}
-
-
 /// Parses the .torrent file
 /// unsafe because it modifies a static variable
 pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
     let contents = read(filename)?;
-    unsafe { TORRENT = from_bytes::<Torrent>(contents.as_slice())?; }
-    unsafe { TORRENT.info_hash = from_bytes(&from_bytes::<InfoHashStruct>(contents.as_slice())?.info_hash)?; }
+    unsafe {
+        TORRENT = from_bytes::<Torrent>(contents.as_slice())?;
+    }
 
-    unsafe{
-    println!("announce: {}", TORRENT.announce);
-    println!("length: {}", TORRENT.info.length);
-    println!("name: {}", TORRENT.info.name);
-    println!("piece length: {}", TORRENT.info.piece_length);
-    println!("pieces vec: {:?}", TORRENT.info.pieces);
+    //in the morning ill figure out if this is actually pulling the right object, this mayu be getting the external struct, so ill need to recurse on it till i find *another* struct, and return that
+    let mut decoder = Decoder::new(contents.as_slice());
+    let infodata = loop {
+        match decoder.next_object() {
+            Ok(Some(Object::Dict(d))) => break d.into_raw(),
+            _ => (),
+        }
+    }?;
+
+    let mut hash = Sha1::new();
+    hash.update(infodata);
+
+    unsafe {
+        TORRENT.info_hash = hash.finalize().to_vec();
+    }
+
+    unsafe {
+        println!("announce: {}", TORRENT.announce);
+        println!("length: {}", TORRENT.info.length);
+        println!("name: {}", TORRENT.info.name);
+        println!("piece length: {}", TORRENT.info.piece_length);
+        println!("pieces vec: {:?}", TORRENT.info.pieces);
     }
     Ok(())
 }
@@ -130,8 +133,6 @@ pub fn get_pieces() -> &'static Vec<u8> {
 pub fn get_file_length() -> u32 {
     unsafe { TORRENT.info.length }
 }
-
-
 
 #[cfg(test)]
 mod test {
