@@ -11,15 +11,18 @@ mod file;
 mod p2p;
 mod peers;
 mod torrent;
+mod tracker;
 
 use clap::Parser;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
+use url::Url;
 use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddrV4};
 
 use crate::peers::Peers;
-use crate::torrent::{parse_torrent_file};
+use crate::torrent::*;
+use crate::tracker::*;
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -60,7 +63,30 @@ fn main() {
     // read in torrent file 
     parse_torrent_file(&args.file).expect("Failed to parse torrent file");
 
-    // println!("{}", get_tracker_url());
+    // uh ill fix this ignore for now
+    println!("{}", get_tracker_url());
+    let mut tracker_sock = TcpStream::connect(*Url::parse("http://128.8.126.63:6969/announce").unwrap().socket_addrs(|| None).unwrap().first().unwrap())
+    .expect("connect failed");
+    const TRACKER: Token = Token(1);
+    let mut tracker_sock2 = TcpStream::from_std(std::net::TcpStream::connect("128.8.126.63:6969").expect("connect failed"));
+
+    println!("addr {:?}\nuh: {:?}", tracker_sock2.peer_addr(), Url::parse("http://128.8.126.63:6969/announce").unwrap().socket_addrs(|| None).unwrap().first().unwrap());
+    // registers our tracker socket in the epoll
+    poll.registry()
+        .register(&mut tracker_sock2, TRACKER, Interest::READABLE)
+        .expect("tracker register failed");
+
+    println!("urmo{}", get_tracker_url());
+    let tracker_request = TrackerRequest::new(
+        "aaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbb",
+        6881,
+        0,
+        0,
+        0,
+    );
+
+    let response = send_tracker_request(&tracker_request, &mut tracker_sock2).unwrap();
     // TODO: ask tracker.rs to talk with tracker
 
     loop {
@@ -76,7 +102,8 @@ fn main() {
                     }
                 }
                 TRACKER => {
-                    handle_tracker_response();
+                    println!("poggers we got a response");
+                    // handle_tracker_response();
                 }
                 token => {
                     if let Some(socket) = sockets.get(&token) {
@@ -129,7 +156,7 @@ fn handle_tracker_response() {
 
 /// handles the message it got from a peer
 fn handle_peer(socket: &TcpStream) {
-    // recv_message(socket);
+    // handle_message(socket);
     // match () {
     //     Choke => {
 
