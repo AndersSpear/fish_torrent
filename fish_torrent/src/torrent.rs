@@ -61,9 +61,9 @@ struct File {
 
 /// Parses the .torrent file
 /// unsafe because it modifies a static variable
-pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
-    let contents = read(filename)?;
-    let torrent = from_bytes::<Torrent>(contents.as_slice())?;
+pub fn parse_torrent_file(filename: &str) {
+    let contents = read(filename).expect("invalid .torrent filename");
+    let torrent = from_bytes::<Torrent>(contents.as_slice()).expect("bruv debnencoding the .torrent failed");
 
     //in the morning ill figure out if this is actually pulling the right object, this mayu be getting the external struct, so ill need to recurse on it till i find *another* struct, and return that
     let mut decoder = Decoder::new(contents.as_slice());
@@ -72,7 +72,7 @@ pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
             Ok(Some(Object::Dict(d))) => break d.into_raw(),
             _ => (),
         }
-    }?;
+    }.expect("meow trying to gety/decode infohash failed");
 
     let mut hash = Sha1::new();
     hash.update(infodata);
@@ -89,8 +89,6 @@ pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
     println!("name: {}", TORRENT.get().unwrap().info.name);
     println!("piece length: {}", TORRENT.get().unwrap().info.piece_length);
     println!("pieces vec: {:?}", TORRENT.get().unwrap().info.pieces);
-
-    Ok(())
 }
 
 /// 20 byte SHA1 hashvalue of the swarm
