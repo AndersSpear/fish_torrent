@@ -12,6 +12,7 @@ use sha1::{Digest, Sha1};
 use std::fs::read;
 use std::sync::OnceLock;
 
+
 static TORRENT: OnceLock<Torrent> = OnceLock::new();
 
 /// part of the torrent struct so you know how to parse the data
@@ -63,7 +64,8 @@ struct File {
 /// unsafe because it modifies a static variable
 pub fn parse_torrent_file(filename: &str) {
     let contents = read(filename).expect("invalid .torrent filename");
-    let torrent = from_bytes::<Torrent>(contents.as_slice()).expect("bruv debnencoding the .torrent failed");
+    let torrent =
+        from_bytes::<Torrent>(contents.as_slice()).expect("bruv debnencoding the .torrent failed");
 
     //in the morning ill figure out if this is actually pulling the right object, this mayu be getting the external struct, so ill need to recurse on it till i find *another* struct, and return that
     let mut decoder = Decoder::new(contents.as_slice());
@@ -81,7 +83,8 @@ pub fn parse_torrent_file(filename: &str) {
             },
             _ => (),
         }
-    }.expect("meow trying to gety/decode infohash failed");
+    }
+    .expect("meow trying to gety/decode infohash failed");
 
     let mut hash = Sha1::new();
     hash.update(infodata);
@@ -98,6 +101,7 @@ pub fn parse_torrent_file(filename: &str) {
     println!("name: {}", TORRENT.get().unwrap().info.name);
     println!("piece length: {}", TORRENT.get().unwrap().info.piece_length);
     println!("pieces vec: {:?}", TORRENT.get().unwrap().info.pieces);
+    println!("infohash: {:?}", TORRENT.get().unwrap().info_hash);
 }
 
 /// 20 byte SHA1 hashvalue of the swarm
@@ -117,7 +121,7 @@ pub fn get_piece_length() -> u32 {
 
 /// number of pieces in the file
 pub fn get_number_of_pieces() -> u32 {
-    TORRENT.get().unwrap().info.pieces.len() as u32
+    TORRENT.get().unwrap().info.pieces.len() as u32 / 20
 }
 
 /// vector of 20 byte SHA1 hashes of each piece
@@ -133,20 +137,58 @@ pub fn get_file_length() -> u32 {
 
 #[cfg(test)]
 mod test {
-    #[test]
-    fn test_function() {}
-
+    use rusty_fork::rusty_fork_test;
+    rusty_fork_test! {
     #[test]
     fn test_parse_torrent_file() {
         super::parse_torrent_file("../artofwar.torrent");
-        assert_eq!(super::TORRENT.get().unwrap().announce, "http://128.8.126.63:6969/announce");
+        assert_eq!(
+            super::TORRENT.get().unwrap().announce,
+            "http://128.8.126.63:6969/announce"
+        );
         assert_eq!(super::TORRENT.get().unwrap().info.length, 63371);
         assert_eq!(super::TORRENT.get().unwrap().info.name, "artofwar.txt");
         assert_eq!(super::TORRENT.get().unwrap().info.piece_length, 32768);
-        assert_eq!(super::TORRENT.get().unwrap().info.pieces, hex::decode("148C74D24BC89E9C7BC1EA97B354AA0DFAD7041BA7C239739231CC40A30879640C7C390BBEE8BFF8").unwrap());
+        assert_eq!(
+            super::TORRENT.get().unwrap().info.pieces,
+            hex::decode(
+                "148C74D24BC89E9C7BC1EA97B354AA0DFAD7041BA7C239739231CC40A30879640C7C390BBEE8BFF8"
+            )
+            .unwrap()
+        );
         assert_eq!(super::TORRENT.get().unwrap().info.files.len(), 0);
         assert_eq!(super::TORRENT.get().unwrap().info_hash.len(), 20);
-        assert_eq!(super::TORRENT.get().unwrap().torrent_mode, super::TorrentMode::SingleFile);
-        assert_eq!(super::TORRENT.get().unwrap().info_hash, hex::decode("a994e40f6c625f26834dfaafcb40d5c5f59fa648").unwrap());
-    }
+        assert_eq!(
+            super::TORRENT.get().unwrap().torrent_mode,
+            super::TorrentMode::SingleFile
+        );
+        assert_eq!(
+            super::TORRENT.get().unwrap().info_hash,
+            hex::decode("a994e40f6c625f26834dfaafcb40d5c5f59fa648").unwrap()
+        );
+    }}
+
+    rusty_fork_test! {
+    #[test]
+    fn test_all_the_accessors() {
+        super::parse_torrent_file("../artofwar.torrent");
+        assert_eq!(
+            super::get_info_hash(),
+            &hex::decode("a994e40f6c625f26834dfaafcb40d5c5f59fa648").unwrap()
+        );
+        assert_eq!(
+            super::get_tracker_url(),
+            &"http://128.8.126.63:6969/announce"
+        );
+        assert_eq!(super::get_piece_length(), 32768);
+        assert_eq!(super::get_number_of_pieces(), 2);
+        assert_eq!(
+            super::get_pieces(),
+            &hex::decode(
+                "148C74D24BC89E9C7BC1EA97B354AA0DFAD7041BA7C239739231CC40A30879640C7C390BBEE8BFF8"
+            )
+            .unwrap()
+        );
+        assert_eq!(super::get_file_length(), 63371);
+    }}
 }

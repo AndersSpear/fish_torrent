@@ -37,8 +37,12 @@ impl OutputFile {
         //file.write_all(&[0]).unwrap();
         //file.seek(SeekFrom::Start(0)).unwrap();
 
-        OutputFile { file, num_pieces, piece_size }
-        
+        OutputFile {
+            file,
+            num_pieces,
+            piece_size,
+        }
+
         //unsafe {
         //    if let Some(file) = &FILE {
         //        panic!("What the fuck are you doing, file was set already");
@@ -63,8 +67,11 @@ impl OutputFile {
         //    }
         //}
 
-        if (begin + block.len()) >= self.piece_size { return Err(Error::msg("begin + block len was larger than piece size!")); }
-        self.file.write_at(&block, ((index * self.piece_size) + begin).try_into()?)?;
+        if (begin + block.len()) >= self.piece_size {
+            return Err(Error::msg("begin + block len was larger than piece size!"));
+        }
+        self.file
+            .write_at(&block, ((index * self.piece_size) + begin).try_into()?)?;
         self.file.flush()?;
         Ok(())
     }
@@ -82,8 +89,11 @@ impl OutputFile {
         //    }
         //}
 
-        if begin > self.piece_size { return Err(Error::msg("begin was larger than piece size!")); }
-        self.file.read_at(&mut buf, ((index * self.piece_size) + begin).try_into()?)?;
+        if begin > self.piece_size {
+            return Err(Error::msg("begin was larger than piece size!"));
+        }
+        self.file
+            .read_at(&mut buf, ((index * self.piece_size) + begin).try_into()?)?;
         Ok(Vec::from(buf))
     }
 }
