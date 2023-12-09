@@ -67,9 +67,18 @@ pub fn parse_torrent_file(filename: &str) {
 
     //in the morning ill figure out if this is actually pulling the right object, this mayu be getting the external struct, so ill need to recurse on it till i find *another* struct, and return that
     let mut decoder = Decoder::new(contents.as_slice());
-    let infodata = loop {
+    let infodata = 'outer: loop {
         match decoder.next_object() {
-            Ok(Some(Object::Dict(d))) => break d.into_raw(),
+            Ok(Some(Object::Dict(mut d))) => loop {
+                match d.next_pair() {
+                    Ok(Some((b"info", Object::Dict(d)))) => {
+                        break 'outer d.into_raw();
+                    }
+                    Ok(Some((_, _))) => (),
+                    Ok(None) => break,
+                    Err(e) => panic!("meow trying to gety/decode infohash failed: {}", e),
+                }
+            },
             _ => (),
         }
     }.expect("meow trying to gety/decode infohash failed");
@@ -126,4 +135,18 @@ pub fn get_file_length() -> u32 {
 mod test {
     #[test]
     fn test_function() {}
+
+    #[test]
+    fn test_parse_torrent_file() {
+        super::parse_torrent_file("../artofwar.torrent");
+        assert_eq!(super::TORRENT.get().unwrap().announce, "http://128.8.126.63:6969/announce");
+        assert_eq!(super::TORRENT.get().unwrap().info.length, 63371);
+        assert_eq!(super::TORRENT.get().unwrap().info.name, "artofwar.txt");
+        assert_eq!(super::TORRENT.get().unwrap().info.piece_length, 32768);
+        assert_eq!(super::TORRENT.get().unwrap().info.pieces, hex::decode("148C74D24BC89E9C7BC1EA97B354AA0DFAD7041BA7C239739231CC40A30879640C7C390BBEE8BFF8").unwrap());
+        assert_eq!(super::TORRENT.get().unwrap().info.files.len(), 0);
+        assert_eq!(super::TORRENT.get().unwrap().info_hash.len(), 20);
+        assert_eq!(super::TORRENT.get().unwrap().torrent_mode, super::TorrentMode::SingleFile);
+        assert_eq!(super::TORRENT.get().unwrap().info_hash, hex::decode("a994e40f6c625f26834dfaafcb40d5c5f59fa648").unwrap());
+    }
 }

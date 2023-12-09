@@ -61,7 +61,7 @@ fn main() {
         .expect("serv register failed");
 
     // read in torrent file
-    parse_torrent_file(&args.file).expect("Failed to parse torrent file");
+    parse_torrent_file(&args.file);
 
     // uh ill fix this ignore for now
     println!("{}", get_tracker_url());
