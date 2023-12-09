@@ -1,8 +1,8 @@
-#![allow(dead_code)] 
+#![allow(dead_code)]
 //self contained code to interface with tracker
 //updates peers every interval
-use std::io::prelude::*;
 use mio::net::TcpStream;
+use std::io::prelude::*;
 use urlencoding::encode;
 
 pub struct TrackerRequest {
@@ -16,7 +16,14 @@ pub struct TrackerRequest {
 
 impl TrackerRequest {
     // Constructor to create a new TrackerRequest
-    pub fn new(info_hash: &str, peer_id: &str, port: u16, uploaded: u64, downloaded: u64, left: u64) -> TrackerRequest {
+    pub fn new(
+        info_hash: &str,
+        peer_id: &str,
+        port: u16,
+        uploaded: u64,
+        downloaded: u64,
+        left: u64,
+    ) -> TrackerRequest {
         TrackerRequest {
             info_hash: info_hash.to_string(),
             peer_id: peer_id.to_string(),
@@ -48,7 +55,14 @@ impl TrackerRequest {
 /// * `uploaded` - The total amount uploaded so far.
 /// * `downloaded` - The total amount downloaded so far.
 /// * `left` - The total amount left to download.
-pub fn construct_tracker_request(info_hash: &str, peer_id: &str, port: u16, uploaded: u64, downloaded: u64, left: u64) -> String {
+pub fn construct_tracker_request(
+    info_hash: &str,
+    peer_id: &str,
+    port: u16,
+    uploaded: u64,
+    downloaded: u64,
+    left: u64,
+) -> String {
     let encoded_info_hash = encode(info_hash);
     let encoded_peer_id = encode(peer_id);
 
@@ -62,7 +76,10 @@ pub fn construct_tracker_request(info_hash: &str, peer_id: &str, port: u16, uplo
 ///
 /// # Arguments
 /// * `request` - The tracker request string to be sent.
-pub fn send_tracker_request(tracker_request: &TrackerRequest, stream: &mut TcpStream) -> std::io::Result<String> {
+pub fn send_tracker_request(
+    tracker_request: &TrackerRequest,
+    stream: &mut TcpStream,
+) -> std::io::Result<String> {
     let request = tracker_request.construct_request_url();
     // let mut stream = TcpStream::connect(connect_to)?;
     stream.write_all(request.as_bytes())?;
@@ -75,7 +92,7 @@ pub fn send_tracker_request(tracker_request: &TrackerRequest, stream: &mut TcpSt
 }
 
 /// Processes the HTTP response received from the tracker.
-/// 
+///
 /// This function should parse the bencoded response and extract a list of peers.
 fn handle_tracker_response() {
     // TODO: Implement this function.

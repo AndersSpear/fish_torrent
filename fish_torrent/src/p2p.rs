@@ -10,6 +10,7 @@ use mio::net::TcpStream;
 use std::io::Error;
 use std::io::Write;
 
+#[derive(Debug)]
 pub struct Messages<'a> {
     // TODO: Some information about peer
     peer: &'a mut Peer,
@@ -18,6 +19,7 @@ pub struct Messages<'a> {
 
 /// A little added enum with associated data structs from Tien :)
 /// length is ususlaly 16Kib, 2^14
+#[derive(Debug)]
 pub enum MessageType {
     Choke,
     Unchoke,
@@ -50,19 +52,6 @@ pub enum MessageType {
     Handshake,
 }
 
-// called when socket triggers, pass in a peer that got triggered
-pub fn handle_messages<'a>(peer: &'a mut Peer) -> Messages<'a> {
-    unimplemented!();
-    //let msg: Message<'a> = get_message(peer);
-
-    //read the message into a buffer
-    //see if its a new handshake, a handshakr response
-    Messages {
-        peer: peer,
-        messages: Vec::new(),
-    }
-}
-
 fn recv_message<'a>(sockfd: u32) -> Messages<'a> {
     unimplemented!();
     //read the message into a buffer
@@ -89,68 +78,84 @@ fn handle_choke(msg: &Messages) {
     unimplemented!();
 }
 
-/// can handle sending any type of message
-/// queues in some sort of send list
-pub fn send_messages(msgs: Messages) -> Result<(), Error> {
-    // <length prefix><message ID><payload>
-    // 4 bytes        1 byte      ? bytes
+impl Messages<'_> {
+    /// can handle sending any type of message
+    /// queues in some sort of send list
+    pub fn send_messages(self) -> Result<(), Error> {
+        // <length prefix><message ID><payload>
+        // 4 bytes        1 byte      ? bytes
 
-    let sock: &mut TcpStream = msgs.peer.get_socket();
-    for msg in msgs.messages {
-        send_message_type(sock, msg)?;
+        let sock: &mut TcpStream = self.peer.get_socket();
+        for msg in self.messages {
+            msg.send(sock)?;
+        }
+        Ok(())
     }
-    Ok(())
+
+    // called when socket triggers, pass in a peer that got triggered
+    pub fn handle_messages<'a>(peer: &'a mut Peer) -> Messages<'a> {
+        unimplemented!();
+        //let msg: Message<'a> = get_message(peer);
+
+        //read the message into a buffer
+        //see if its a new handshake, a handshakr response
+        Messages {
+            peer: peer,
+            messages: Vec::new(),
+        }
+    }
 }
 
-fn send_message_type(sock: &mut TcpStream, msg: MessageType) -> Result<(), Error> {
-    match msg {
-        MessageType::Choke => {
-            send_len_id(sock, 1, 0)?;
+impl MessageType {
+    fn send(self, sock: &mut TcpStream) -> Result<(), Error> {
+        match self {
+            MessageType::Choke => {
+                send_len_id(sock, 1, 0)?;
+            }
+            MessageType::Unchoke => {
+                send_len_id(sock, 1, 1)?;
+            }
+            MessageType::Interested => {
+                send_len_id(sock, 1, 2)?;
+            }
+            MessageType::NotInterested => {
+                send_len_id(sock, 1, 3)?;
+            }
+            MessageType::Have { index } => {
+                send_have(sock, index)?;
+            }
+            MessageType::Bitfield { field } => {
+                send_bitfield(sock, field)?;
+            }
+            MessageType::Request {
+                index,
+                begin,
+                length,
+            } => {
+                send_request_or_cancel(sock, true, index, begin, length)?;
+            }
+            MessageType::Piece {
+                index,
+                begin,
+                block,
+            } => {
+                send_piece(sock, index, begin, block)?;
+            }
+            MessageType::Cancel {
+                index,
+                begin,
+                length,
+            } => {
+                send_request_or_cancel(sock, false, index, begin, length)?;
+            }
+            MessageType::KeepAlive => {
+                sock.write_all(&[0; 4])?;
+            }
+            MessageType::Handshake => send_handshake(sock)?,
         }
-        MessageType::Unchoke => {
-            send_len_id(sock, 1, 1)?;
-        }
-        MessageType::Interested => {
-            send_len_id(sock, 1, 2)?;
-        }
-        MessageType::NotInterested => {
-            send_len_id(sock, 1, 3)?;
-        }
-        MessageType::Have { index } => {
-            send_have(sock, index)?;
-        }
-        MessageType::Bitfield { field } => {
-            send_bitfield(sock, field)?;
-        }
-        MessageType::Request {
-            index,
-            begin,
-            length,
-        } => {
-            send_request_or_cancel(sock, true, index, begin, length)?;
-        }
-        MessageType::Piece {
-            index,
-            begin,
-            block,
-        } => {
-            send_piece(sock, index, begin, block)?;
-        }
-        MessageType::Cancel {
-            index,
-            begin,
-            length,
-        } => {
-            send_request_or_cancel(sock, false, index, begin, length)?;
-        }
-        MessageType::KeepAlive => {
-            sock.write_all(&[0; 4])?;
-        }
-        MessageType::Handshake => send_handshake(sock)?,
+        Ok(())
     }
-    Ok(())
 }
-
 fn send_len_id(sock: &mut TcpStream, len: u32, id: u8) -> Result<(), Error> {
     let mut buf = vec![0; 5];
     buf[0..4].copy_from_slice(&len.to_be_bytes());

@@ -10,19 +10,9 @@ use bendy::serde::from_bytes;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::fs::read;
+use std::sync::OnceLock;
 
-static mut TORRENT: Torrent = Torrent {
-    announce: String::new(),
-    info: Info {
-        length: 0,
-        name: String::new(),
-        piece_length: 0,
-        pieces: Vec::new(),
-        files: Vec::new(),
-    },
-    info_hash: Vec::new(),
-    torrent_mode: TorrentMode::SingleFile,
-};
+static TORRENT: OnceLock<Torrent> = OnceLock::new();
 
 /// part of the torrent struct so you know how to parse the data
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -38,7 +28,7 @@ impl Default for TorrentMode {
 }
 
 /// main torrent struct, is initilalized during parse_torrent_file
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 struct Torrent {
     announce: String, // url of the tracker (http or udp)
     info: Info,
@@ -50,7 +40,7 @@ struct Torrent {
     torrent_mode: TorrentMode, // single file or multiple file mode
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 struct Info {
     #[serde(default)]
     length: u32, // number of bytes of the file
@@ -73,9 +63,7 @@ struct File {
 /// unsafe because it modifies a static variable
 pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
     let contents = read(filename)?;
-    unsafe {
-        TORRENT = from_bytes::<Torrent>(contents.as_slice())?;
-    }
+    let torrent = from_bytes::<Torrent>(contents.as_slice())?;
 
     //in the morning ill figure out if this is actually pulling the right object, this mayu be getting the external struct, so ill need to recurse on it till i find *another* struct, and return that
     let mut decoder = Decoder::new(contents.as_slice());
@@ -89,49 +77,51 @@ pub fn parse_torrent_file(filename: &str) -> Result<(), Error> {
     let mut hash = Sha1::new();
     hash.update(infodata);
 
-    unsafe {
-        TORRENT.info_hash = hash.finalize().to_vec();
-    }
+    let torrent = Torrent {
+        info_hash: hash.finalize().to_vec(),
+        ..torrent
+    };
 
-    unsafe {
-        println!("announce: {}", TORRENT.announce);
-        println!("length: {}", TORRENT.info.length);
-        println!("name: {}", TORRENT.info.name);
-        println!("piece length: {}", TORRENT.info.piece_length);
-        println!("pieces vec: {:?}", TORRENT.info.pieces);
-    }
+    TORRENT.set(torrent).expect("Failed to set torrent");
+
+    println!("announce: {}", TORRENT.get().unwrap().announce);
+    println!("length: {}", TORRENT.get().unwrap().info.length);
+    println!("name: {}", TORRENT.get().unwrap().info.name);
+    println!("piece length: {}", TORRENT.get().unwrap().info.piece_length);
+    println!("pieces vec: {:?}", TORRENT.get().unwrap().info.pieces);
+
     Ok(())
 }
 
 /// 20 byte SHA1 hashvalue of the swarm
 pub fn get_info_hash() -> &'static Vec<u8> {
-    unsafe { &TORRENT.info_hash }
+    &TORRENT.get().unwrap().info_hash
 }
 
 /// url of the tracker
 pub fn get_tracker_url() -> &'static String {
-    unsafe { &TORRENT.announce }
+    &TORRENT.get().unwrap().announce
 }
 
 /// length of each piece in bytes
 pub fn get_piece_length() -> u32 {
-    unsafe { TORRENT.info.piece_length }
+    TORRENT.get().unwrap().info.piece_length
 }
 
 /// number of pieces in the file
 pub fn get_number_of_pieces() -> u32 {
-    unsafe { TORRENT.info.pieces.len() as u32 }
+    TORRENT.get().unwrap().info.pieces.len() as u32
 }
 
 /// vector of 20 byte SHA1 hashes of each piece
 /// each hash is a vector of 20 bytes
 pub fn get_pieces() -> &'static Vec<u8> {
-    unsafe { &TORRENT.info.pieces }
+    &TORRENT.get().unwrap().info.pieces
 }
 
 /// file length in bytes
 pub fn get_file_length() -> u32 {
-    unsafe { TORRENT.info.length }
+    TORRENT.get().unwrap().info.length
 }
 
 #[cfg(test)]

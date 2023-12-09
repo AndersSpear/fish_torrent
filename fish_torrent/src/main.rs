@@ -16,9 +16,9 @@ mod tracker;
 use clap::Parser;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
-use url::Url;
 use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddrV4};
+use url::Url;
 
 use crate::peers::Peers;
 use crate::torrent::*;
@@ -65,12 +65,30 @@ fn main() {
 
     // uh ill fix this ignore for now
     println!("{}", get_tracker_url());
-    let mut tracker_sock = TcpStream::connect(*Url::parse("http://128.8.126.63:6969/announce").unwrap().socket_addrs(|| None).unwrap().first().unwrap())
+    let mut tracker_sock = TcpStream::connect(
+        *Url::parse("http://128.8.126.63:6969/announce")
+            .unwrap()
+            .socket_addrs(|| None)
+            .unwrap()
+            .first()
+            .unwrap(),
+    )
     .expect("connect failed");
     const TRACKER: Token = Token(1);
-    let mut tracker_sock2 = TcpStream::from_std(std::net::TcpStream::connect("128.8.126.63:6969").expect("connect failed"));
+    let mut tracker_sock2 = TcpStream::from_std(
+        std::net::TcpStream::connect("128.8.126.63:6969").expect("connect failed"),
+    );
 
-    println!("addr {:?}\nuh: {:?}", tracker_sock2.peer_addr(), Url::parse("http://128.8.126.63:6969/announce").unwrap().socket_addrs(|| None).unwrap().first().unwrap());
+    println!(
+        "addr {:?}\nuh: {:?}",
+        tracker_sock2.peer_addr(),
+        Url::parse("http://128.8.126.63:6969/announce")
+            .unwrap()
+            .socket_addrs(|| None)
+            .unwrap()
+            .first()
+            .unwrap()
+    );
     // registers our tracker socket in the epoll
     poll.registry()
         .register(&mut tracker_sock2, TRACKER, Interest::READABLE)

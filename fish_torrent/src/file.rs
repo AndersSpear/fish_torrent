@@ -29,12 +29,11 @@ fn init_file(name: &str, piece_size: usize) {
     //    .unwrap();
     //file.write_all(&[0]).unwrap();
     //file.seek(SeekFrom::Start(0)).unwrap();
-    
+
     unsafe {
         if let Some(file) = &FILE {
             panic!("What the fuck are you doing, file was set already");
-        }
-        else {
+        } else {
             //FILE = Some(MmapMut::map_mut(&file).expect("wacky"));
             FILE = Some(file);
             SIZE = Some(piece_size);
