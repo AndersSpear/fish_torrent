@@ -12,7 +12,6 @@ use sha1::{Digest, Sha1};
 use std::fs::read;
 use std::sync::OnceLock;
 
-
 static TORRENT: OnceLock<Torrent> = OnceLock::new();
 
 /// part of the torrent struct so you know how to parse the data
