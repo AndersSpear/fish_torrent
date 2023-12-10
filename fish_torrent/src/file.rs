@@ -26,7 +26,7 @@ impl OutputFile {
     /// or write call.
     /// Returns None if the file was not able to be created for any reason.
     pub fn new(name: &str, num_pieces: usize, piece_size: usize) -> Option<Self> {
-        let mut file = OpenOptions::new()
+        let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -126,7 +126,9 @@ impl OutputFile {
             hasher.finalize_into((&mut hash).into());
             Ok(hash)
         } else {
-            Err(Error::msg("hash_piece() was called before the piece was finished!"))
+            Err(Error::msg(
+                "hash_piece() was called before the piece was finished!",
+            ))
         }
     }
 
@@ -155,8 +157,8 @@ mod test {
         let _ = fs::remove_file(filename);
         let mut test_file = OutputFile::new(filename, 5, 10).unwrap();
         // Write some data.
-        test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd']));
-        test_file.write_block(1, 0, Vec::from([b'x', b'y', b'z']));
+        _ = test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd']));
+        _ = test_file.write_block(1, 0, Vec::from([b'x', b'y', b'z']));
         // See if that data reads back.
         let test = test_file.read_block(0, 0, 4).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
@@ -165,12 +167,12 @@ mod test {
         dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b'x', b'y', b'z']));
         // Write some more data, this time at an offset. And read it back.
-        test_file.write_block(0, 5, Vec::from([b't', b'v']));
+        _ = test_file.write_block(0, 5, Vec::from([b't', b'v']));
         let test = test_file.read_block(0, 5, 2).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b't', b'v']));
         // Write data up to the very end of the params
-        test_file.write_block(4, 8, Vec::from([b'a', b'b']));
+        _ = test_file.write_block(4, 8, Vec::from([b'a', b'b']));
         let test = test_file.read_block(4, 8, 2).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b'a', b'b']));
@@ -223,8 +225,8 @@ mod test {
         assert!(test_file.read_block(0, 5, 5).is_ok());
         assert!(test_file.read_block(0, 5, 6).is_err());
 
-        test_file.write_block(0, 5, Vec::from([b'a', b'b', b'c', b'd', b'e']));
-        test_file.write_block(4, 5, Vec::from([b'v', b'w', b'x', b'y', b'z']));
+        _ = test_file.write_block(0, 5, Vec::from([b'a', b'b', b'c', b'd', b'e']));
+        _ = test_file.write_block(4, 5, Vec::from([b'v', b'w', b'x', b'y', b'z']));
         let tmp = test_file.read_block(0, 5, 5).unwrap();
         assert_eq!(tmp, Vec::from([b'a', b'b', b'c', b'd', b'e']));
         let tmp = test_file.read_block(4, 5, 5).unwrap();
@@ -253,8 +255,8 @@ mod test {
         }
 
         // Write to file and check to make sure that BitVec matches the bytes written.
-        dbg!(&test_file.pieces[0]);
-        dbg!(&test_file.pieces[1]);
+        //dbg!(&test_file.pieces[0]);
+        //dbg!(&test_file.pieces[1]);
         // No writes should return true, as none of them fill the piece.
         assert_eq!(
             test_file
@@ -281,8 +283,8 @@ mod test {
         assert_eq!(test_file.pieces[0].get(7).as_deref().unwrap(), &true);
         assert_eq!(test_file.pieces[1].get(0).as_deref().unwrap(), &true);
         assert_eq!(test_file.pieces[1].get(1).as_deref().unwrap(), &true);
-        dbg!(&test_file.pieces[0]);
-        dbg!(&test_file.pieces[1]);
+        //dbg!(&test_file.pieces[0]);
+        //dbg!(&test_file.pieces[1]);
 
         // Random spot checks to make sure bits weren't randomly flipped.
         assert_eq!(test_file.pieces[0].get(2).as_deref().unwrap(), &false);
@@ -301,7 +303,7 @@ mod test {
                 .unwrap(),
             true
         );
-        dbg!(&test_file.pieces[1]);
+        //dbg!(&test_file.pieces[1]);
     }
 
     #[test]
