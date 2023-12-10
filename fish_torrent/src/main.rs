@@ -44,8 +44,7 @@ fn main() {
     let mut sockets: HashMap<Token, TcpStream> = HashMap::new();
 
     // binds to INADDR_ANY
-    // NOTE: Tien made this change--SocketAddr implements From<> so you don't have to be so verbose
-    //let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(
+    let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(
     let mut serv_sock = TcpListener::bind(SocketAddrV4::new(
         Ipv4Addr::UNSPECIFIED,
         args.port,
