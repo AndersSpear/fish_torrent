@@ -45,7 +45,6 @@ fn main() {
 
     // binds to INADDR_ANY
     let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(
-    let mut serv_sock = TcpListener::bind(SocketAddrV4::new(
         Ipv4Addr::UNSPECIFIED,
         args.port,
     )))
