@@ -1,9 +1,26 @@
 #![allow(dead_code)]
+use bendy::serde::from_bytes;
 //self contained code to interface with tracker
 //updates peers every interval
 use mio::net::TcpStream;
 use std::io::prelude::*;
 use urlencoding::encode;
+use serde::{Deserialize, Serialize};
+enum Peers {
+    Compact(Vec<u8>),
+    NonCompact(Vec<Peer>),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct TrackerResponse {
+
+    interval: i64,
+    #[serde(rename = "min interval")]
+    min_interval: i64,
+    peers: Peers,  // Assuming compact format
+    complete: i64,
+    incomplete: i64,
+}
 
 pub struct TrackerRequest {
     info_hash: String,
@@ -12,6 +29,11 @@ pub struct TrackerRequest {
     uploaded: u64,
     downloaded: u64,
     left: u64,
+}
+
+struct Peer {
+    ip: std::net::Ipv4Addr,
+    port: u16,
 }
 
 impl TrackerRequest {
@@ -72,39 +94,80 @@ pub fn construct_tracker_request(
     )
 }
 
-/// Sends a tracker request and returns the response as a String.
+pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> {
+    let separator_pos = response
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|pos| pos + 4);
+
+    match separator_pos {
+        Some(pos) => {
+            let body_bytes = &response[pos..];
+            println!("BODY_BYTES BRUH{}", String::from_utf8_lossy(body_bytes).to_string());
+            Ok(body_bytes.to_vec())
+
+        }
+        None => Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Failed to find separator in HTTP response",
+        )),
+    }
+}
+
+
+/// Sends a tracker request and returns the response as a Vec<u8>.
 ///
 /// # Arguments
 /// * `request` - The tracker request string to be sent.
 pub fn send_tracker_request(
     tracker_request: &TrackerRequest,
     stream: &mut TcpStream,
-) -> std::io::Result<String> {
+) -> std::io::Result<Vec<u8>> {
     let request = tracker_request.construct_request_url();
-    // let mut stream = TcpStream::connect(connect_to)?;
     stream.write_all(request.as_bytes())?;
     stream.flush()?;
 
+    // Read the HTTP response
     let mut response = Vec::new();
     stream.read_to_end(&mut response)?;
 
-    Ok(String::from_utf8_lossy(&response).to_string())
+    // Find the position of the double CRLF separator
+    //iterates through byte vector
+    Ok(response)
 }
+
+use bendy::decoding::{FromBencode, Decoder};
+use std::io::Cursor;
+use std::net::Ipv4Addr;
 
 /// Processes the HTTP response received from the tracker.
 ///
 /// This function should parse the bencoded response and extract a list of peers.
-fn handle_tracker_response() {
-    // TODO: Implement this function.
-    // The response will be bencoded. Unbencode it and extract a list of peers.
+pub fn handle_tracker_response(response_data: &Vec<u8>) -> Result<TrackerResponse, bendy::decoding::Error> {
+    let body = parse_body_from_response(response_data)?;
+    println!("Response Body: {:?}", &body);
+
+
+    let response =
+    from_bytes::<TrackerResponse>(body.as_slice()).expect("decode response failed");
+    Ok(response)
+
+
+
 }
 
-/// Initializes the tracker by sending the initial request.
-/// This function may not be necessary depending on the protocol requirements.
-fn init_tracker() {
-    // TODO: Implement this function if needed.
-    // This might involve calling `send_tracker_request` and `handle_tracker_response`.
-}
+// fn parse_peers(peers_data: &[u8]) -> Result<Vec<Peer>, bendy::Error> {
+//     let mut peers = Vec::new();
+//     let mut cursor = Cursor::new(peers_data);
+
+//     while (cursor.position() as usize) < peers_data.len() {
+//         let ip = Ipv4Addr::new(cursor.get_u8(), cursor.get_u8(), cursor.get_u8(), cursor.get_u8());
+//         let port = cursor.get_u16_be();
+//         peers.push(Peer { ip, port });
+//     }
+
+//     Ok(peers)
+// }
 
 /// Updates the tracker with the current status and requests new data.
 fn update_tracker() {
@@ -142,9 +205,51 @@ mod tests {
         );
 
         // this should only fail if the UMD server is down.
-        // let response = send_tracker_request(&tracker_request, "poole.cs.umd.edu:6969").unwrap();
+        //let response = send_tracker_request(&tracker_request, "poole.cs.umd.edu:6969").unwrap();
 
-        // 'interval' is inside every bencode.
-        // assert!(response.contains("interval"));
+        // for s in &response {
+        //     println!("{}", s);
+        // }
+
+        //test that the string representation of response contains 'interval'
+        // let string_representation = String::from_utf8_lossy(&response).to_string();
+        // println!("{}", &string_representation);
+        // assert!(&string_representation.contains("interval"));
+
+
+    }
+
+
+    fn test_handle_tracker_response() {
+        let tracker_request = TrackerRequest::new(
+            "aaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbb",
+            6881,
+            0,
+            0,
+            0,
+        );
+
+        // this should only fail if the UMD server is down.
+        //let response = send_tracker_request(&tracker_request, "poole.cs.umd.edu:6969").unwrap();
+
+        //for s in &response {
+            //println!("{}", s);
+        //}
+
+        //test that the string representation of response contains 'interval'
+        //let string_representation = String::from_utf8_lossy(&response).to_string();
+        // println!("{}", &string_representation);
+        // assert!(&string_representation.contains("interval"));
+
+        // let v = string_representation.clone();
+        
+        //let parsed_message = handle_tracker_response(&response);
+        // for s in parsed_message.unwrap() {
+        //     println!("{}", s);
+        // }
+
+
+
     }
 }
