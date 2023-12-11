@@ -3,23 +3,20 @@ use bendy::serde::from_bytes;
 //self contained code to interface with tracker
 //updates peers every interval
 use mio::net::TcpStream;
+use std::ascii::escape_default;
 use std::io::prelude::*;
 use urlencoding::encode;
 use serde::{Deserialize, Serialize};
-enum Peers {
-    Compact(Vec<u8>),
-    NonCompact(Vec<Peer>),
-}
+// enum Peers {
+//     Compact(Vec<u8>),
+//     NonCompact(Vec<Peer>),
+// }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TrackerResponse {
 
     interval: i64,
-    #[serde(rename = "min interval")]
-    min_interval: i64,
-    peers: Peers,  // Assuming compact format
-    complete: i64,
-    incomplete: i64,
+    peers: String  // Assuming compact format
 }
 
 pub struct TrackerRequest {
@@ -135,8 +132,18 @@ pub fn send_tracker_request(
     //iterates through byte vector
     Ok(response)
 }
+use bendy::decoding::{FromBencode, Error, Object};
 
-use bendy::decoding::{FromBencode, Decoder};
+fn show(bs: &[u8]) -> String {
+    let mut visible = String::new();
+    for &b in bs {
+        let part: Vec<u8> = escape_default(b).collect();
+        visible.push_str(&String::from_utf8(part).unwrap());
+    }
+    visible
+}
+
+use bendy::decoding::{Decoder};
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 
@@ -145,7 +152,26 @@ use std::net::Ipv4Addr;
 /// This function should parse the bencoded response and extract a list of peers.
 pub fn handle_tracker_response(response_data: &Vec<u8>) -> Result<TrackerResponse, bendy::decoding::Error> {
     let body = parse_body_from_response(response_data)?;
-    println!("Response Body: {:?}", &body);
+    //println!("Response Body: {}", show(body.as_slice()));
+
+    let mut decoder = Decoder::new(body.as_slice());
+    let infodata = 'outer: loop {
+        match decoder.next_object() {
+            Ok(Some(Object::Dict(mut d))) => loop {
+                match d.next_pair() {
+                    Ok(Some((b"interval", Object::Integer(d)))) => {
+                        break 'outer d;
+                    }
+                    Ok(Some((_, _))) => (),
+                    Ok(None) => break,
+                    Err(e) => panic!("meow trying to gety/decode infohash failed: {}", e),
+                }
+            },
+            _ => (),
+        }
+    };
+
+    println!("yay an int {}", infodata);
 
 
     let response =

@@ -121,7 +121,7 @@ fn main() {
                 }
                 TRACKER => {
                     println!("poggers we got a response");
-                    let x = tracker::handle_tracker_response(&response).expect("could not do it");
+                    let x: TrackerResponse = tracker::handle_tracker_response(&response).expect("could not do it");
                     dbg!(x);
                     // handle_tracker_response();
                     // what should the argument be?
