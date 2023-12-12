@@ -132,7 +132,7 @@ fn main() {
                 TRACKER => {
                     // is it a readable ?? (receive blasted message)
                     if event.is_readable() {
-                        // handle_tracker_response(&mut tracker_sock);
+                        handle_tracker_response(&mut tracker_sock);
                         poll.registry().deregister(&mut tracker_sock);
                     }
                     // is it a writable ?? (blast message out)
