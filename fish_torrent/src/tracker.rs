@@ -21,8 +21,8 @@ pub struct TrackerResponseBeta {
 
 #[derive(Debug)]
 pub struct TrackerResponse {
-    interval: i64,
-    socket_addr_list: Vec<SocketAddr>
+    pub interval: i64,
+    pub socket_addr_list: Vec<SocketAddr>
 }
 
 pub struct TrackerRequest {
