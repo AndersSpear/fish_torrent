@@ -69,6 +69,12 @@ pub fn send_all(peers: &mut Peers) -> Result<(), Error> {
 }
 
 impl Messages {
+    pub fn new() -> Self {
+        Messages {
+            messages: Vec::new(),
+        }
+    }
+
     /// can handle sending any type of message
     /// queues in some sort of send list
     fn send_messages(self, sock: &mut TcpStream) -> Result<(), Error> {
