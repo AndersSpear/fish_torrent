@@ -132,8 +132,8 @@ fn main() {
                 TRACKER => {
                     // is it a readable ?? (receive blasted message)
                     if event.is_readable() {
-                        handle_tracker_response(&mut tracker_sock);
-                        poll.registry().deregister(&mut tracker_sock);
+                        let ret = tracker::handle_tracker_response(&mut tracker_sock).expect("tracker failed to read");
+                        poll.registry().deregister(&mut tracker_sock).expect("tracker deregister fail");
                     }
                     // is it a writable ?? (blast message out)
                     else if event.is_writable() {
@@ -146,7 +146,7 @@ fn main() {
                             0,
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
-                        poll.registry().reregister(&mut tracker_sock, TRACKER, Interest::READABLE);
+                        poll.registry().reregister(&mut tracker_sock, TRACKER, Interest::READABLE).expect("tracker rereg fail");
                     }
                 }
                 token => {
