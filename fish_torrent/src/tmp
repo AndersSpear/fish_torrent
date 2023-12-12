@@ -1,0 +1,5 @@
+fn bytes_to_urlencoding(bytes: &[u8]) -> Vec<u8> {
+    for b in bytes {
+        format!("{:02X}", data);
+    }
+}

@@ -95,7 +95,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
     let mut return_msgs = Messages { messages: vec![] };
 
     let mut local_buf = vec![];
-    let sock = peer.get_socket();
+    let sock = peer.get_mut_socket();
 
     let readcount = match sock.read_to_end(&mut local_buf) {
         Ok(n) => n,

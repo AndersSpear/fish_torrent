@@ -67,7 +67,7 @@ impl Peer {
             .expect(format!("Connection to {:?} failed", self.socket).as_str());
     }
 
-    pub fn get_socket(&mut self) -> &mut TcpStream {
+    pub fn get_mut_socket(&mut self) -> &mut TcpStream {
         &mut self.socket
     }
 
@@ -131,11 +131,11 @@ impl Peers {
     /// The Peers struct will take ownership of the peer given.
     /// Additionally, it will return an Error if the peer id is already in the Peers struct.
     /// However, even on Error, ownership of the Peer will be taken.
-    pub fn add_peer(&mut self, addr: SocketAddr, peer: Peer) -> Result<()> {
+    pub fn add_peer(&mut self, addr: SocketAddr, peer: Peer) -> Result<&mut TcpStream> {
         if self.list.contains_key(&addr) == false
             && self.incomplete.contains_key(&addr) == false {
             self.list.insert(addr, peer);
-            Ok(())
+            Ok(self.list.get_mut(&addr).expect("Uhhh contact tien").get_mut_socket())
         } else {
             Err(Error::msg(
                 "peer's peer_id was already found in the Peers struct!",
@@ -149,11 +149,11 @@ impl Peers {
         self.list.remove(&addr)
     }
 
-    pub fn add_incomplete_peer(&mut self, addr: SocketAddr, sock: TcpStream) -> Result<()> {
+    pub fn add_incomplete_peer(&mut self, addr: SocketAddr, sock: TcpStream) -> Result<&mut TcpStream> {
         if self.list.contains_key(&addr) == false
             && self.incomplete.contains_key(&addr) == false {
             self.incomplete.insert(addr, Peer::new_incomplete(sock));
-            Ok(())
+            Ok(self.incomplete.get_mut(&addr).expect("Uhhh contact tien").get_mut_socket())
         } else {
             Err(Error::msg(
                 "peer's peer_id was already found in the Peers struct!",
