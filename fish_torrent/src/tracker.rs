@@ -13,9 +13,16 @@ use serde::{Deserialize, Serialize};
 // }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
+pub struct TrackerResponseBeta {
+    interval: i64,
+    #[serde(with = "serde_bytes")]
+    peers: Vec<u8>,  // Assuming compact format
+}
+
+#[derive(Debug)]
 pub struct TrackerResponse {
     interval: i64,
-    peers: Vec<u8>  // Assuming compact format
+    socket_addr_list: Vec<SocketAddr>
 }
 
 pub struct TrackerRequest {
@@ -144,7 +151,7 @@ fn show(bs: &[u8]) -> String {
 
 use bendy::decoding::{Decoder};
 use std::io::Cursor;
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, SocketAddr, IpAddr};
 
 /// Processes the HTTP response received from the tracker.
 ///
@@ -165,8 +172,19 @@ pub fn handle_tracker_response(response_data: &Vec<u8>) -> Result<TrackerRespons
     let mut file = File::create(file_path).expect("Failed to create file");
     file.write_all(&body).expect("Failed to write to file");
 
-    let tr = from_bytes::<TrackerResponse>(body.as_slice()).expect("Decoding the .torrent failed");
-    Ok(tr)
+    let trb = from_bytes::<TrackerResponseBeta>(body.as_slice()).expect("Decoding the .torrent failed");
+    let mut sock_addr_list = Vec::new();
+    for chunk in trb.peers.chunks_exact(6) {
+        let ip_bytes = &chunk[0..4];
+        let port_bytes = &chunk[4..6];
+        let ip_addr = std::net::Ipv4Addr::from(<[u8; 4]>::try_from(ip_bytes).unwrap());
+        let port = u16::from_be_bytes(<[u8; 2]>::try_from(port_bytes).unwrap());
+
+        
+        let socket = SocketAddr::new(IpAddr::V4(ip_addr), port);
+        sock_addr_list.push(socket);
+    }
+    Ok(TrackerResponse { interval: trb.interval, socket_addr_list: sock_addr_list })
 }
 
 // fn parse_peers(peers_data: &[u8]) -> Result<Vec<Peer>, bendy::Error> {
