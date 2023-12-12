@@ -1,6 +1,7 @@
 #![allow(dead_code)] 
-//implements game theory
-//tells bittorrent what do so with a particular peer
+//! implements game theory
+//! tells bittorrent EVERY MESSSAGE THAT NEEDS TO BE SENT at the moment that its called
+
 use crate::peers::Peers;
 use crate::p2p::*;
 

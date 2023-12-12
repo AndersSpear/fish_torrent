@@ -2,18 +2,24 @@
 #![warn(missing_docs)]
 //! this is responsible for low level p2p communication
 //! send messages to peers, recieve messages from peers, does not handle the logic of what to do with the messages.
+use crate::peers::Peers;
+
 use super::peers::Peer;
 use super::torrent;
 use bitvec::prelude::*;
 
+use byteorder::ByteOrder;
 use mio::net::TcpStream;
 use std::io::Error;
+use std::io::Read;
 use std::io::Write;
 
-#[derive(Debug)]
-pub struct Messages<'a> {
-    // TODO: Some information about peer
-    peer: &'a mut Peer,
+use byteorder::BigEndian;
+
+use anyhow::Result;
+
+#[derive(Debug, Default)]
+pub struct Messages {
     messages: Vec<MessageType>,
 }
 
@@ -52,58 +58,162 @@ pub enum MessageType {
     Handshake,
 }
 
-fn recv_message<'a>(sockfd: u32) -> Messages<'a> {
+/// sends all messages in the peers struct
+pub fn send_all(peers: &mut Peers) -> Result<(), Error> {
     unimplemented!();
-    //read the message into a buffer
-    //see if its a new handshake, a handshakr response
-    //if its a handshake response, return a handshake response message
-    //if its a message, return a message
+
+    // for peer in peers {
+    //     peer.messages.send_messages()?;
+    // }
+    // Ok(())
 }
 
-// TODO: Another way to implement the above is an associated function/method
-// impl Message<'_> {
-//     // Instead of passing the msg in, now we can call the function via
-//     // msg.handle_message() <--- Isn't that cool?
-//     // Your preference!
-//     fn handle_message(&self) {
-//         match self.m_type {
-//             MessageType::Choke => handle_choke(&self),
-//             _ => todo!() //TODO
-//         }
-//     }
-// }
-
-/// if we get chcked, make sure to remove the send buffer for that person
-fn handle_choke(msg: &Messages) {
-    unimplemented!();
-}
-
-impl Messages<'_> {
+impl Messages {
     /// can handle sending any type of message
     /// queues in some sort of send list
-    pub fn send_messages(self) -> Result<(), Error> {
+    fn send_messages(self, sock: &mut TcpStream) -> Result<(), Error> {
         // <length prefix><message ID><payload>
         // 4 bytes        1 byte      ? bytes
 
-        let sock: &mut TcpStream = self.peer.get_socket();
+        // TODO catch if it would block
         for msg in self.messages {
             msg.send(sock)?;
         }
         Ok(())
     }
 
-    // called when socket triggers, pass in a peer that got triggered
-    pub fn handle_messages<'a>(peer: &'a mut Peer) -> Messages<'a> {
-        unimplemented!();
-        //let msg: Message<'a> = get_message(peer);
+    //TODO look at types of send failures
+    /// called when socket triggers, pass in a peer that got triggered
+    pub fn handle_messages(peer: &mut Peer) -> Result<()> {
+        let mut return_msgs = Messages { messages: vec![] };
 
-        //read the message into a buffer
-        //see if its a new handshake, a handshakr response
-        Messages {
-            peer: peer,
-            messages: Vec::new(),
+        let mut local_buf = vec![];
+        let sock = peer.get_socket();
+
+        let readcount = match sock.read_to_end(&mut local_buf) {
+            Ok(n) => n,
+            Err(e) => {
+                println!("Error reading from socket: {}", e);
+                0
+            }
+        };
+        println!("read {} bytes from socket", readcount);
+
+        let mut buf = peer.get_mut_recv_buffer();
+        buf.append(&mut local_buf);
+
+        loop {
+            match parse_message(&mut buf) {
+                Some(msg) => {
+                    return_msgs.messages.push(msg);
+                }
+                None => {
+                    break;
+                }
+            }
         }
+
+        peer.set_messages(return_msgs);
+        Ok(())
     }
+}
+
+// TODO make sure this handles handshakes smile
+/// tries to parse one message from the buffer
+fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
+    if buf.len() < 4 {
+        return None;
+    }
+    let len = BigEndian::read_u32(&buf[0..4]);
+
+    //this could break if buf[0..4] gets corrupted and is big
+    if buf.len() < len as usize + 4 {
+        return None;
+    }
+
+    //matching on the length
+    //panics if first 4 bytes arent a big endian number!
+    Some(match len {
+        0 => {
+            buf.drain(0..4);
+            MessageType::KeepAlive
+        }
+        1 => match buf[4] {
+            0 => {
+                buf.drain(0..5);
+                MessageType::Choke
+            }
+            1 => {
+                buf.drain(0..5);
+                MessageType::Unchoke
+            }
+            2 => {
+                buf.drain(0..5);
+                MessageType::Interested
+            }
+            3 => {
+                buf.drain(0..5);
+                MessageType::NotInterested
+            }
+            _ => {
+                println!("malformed message, clearing buffer");
+                buf.clear();
+                return None;
+            }
+        },
+        n => {
+            if buf[4] == 4 && n == 5 {
+                let index = BigEndian::read_u32(&buf[5..9]);
+                buf.drain(0..9);
+                MessageType::Have {
+                    index: index as usize,
+                }
+            } else if (buf[4] == 8 || buf[4] == 6) && n == 13 {
+                let index = BigEndian::read_u32(&buf[5..9]);
+                let begin = BigEndian::read_u32(&buf[9..13]);
+                let length = BigEndian::read_u32(&buf[13..17]);
+                buf.drain(0..17);
+
+                match buf[4] {
+                    6 => MessageType::Request {
+                        index: index as usize,
+                        begin: begin as usize,
+                        length: length as usize,
+                    },
+                    8 => MessageType::Cancel {
+                        index: index as usize,
+                        begin: begin as usize,
+                        length: length as usize,
+                    },
+                    _ => {
+                        println!("malformed message, clearing buffer");
+                        buf.clear();
+                        return None;
+                    }
+                }
+            } else if (buf[4] == 7) && n > 9 {
+                let index = BigEndian::read_u32(&buf[5..9]);
+                let begin = BigEndian::read_u32(&buf[9..13]);
+                let block = buf[13..].to_vec();
+                buf.drain(0..13);
+                buf.drain(0..block.len());
+                MessageType::Piece {
+                    index: index as usize,
+                    begin: begin as usize,
+                    block,
+                }
+            } else if (buf[4] == 5) && n > 5 {
+                let field = BitVec::from_vec(buf[5..].to_vec());
+                buf.drain(0..5);
+                buf.drain(0..field.len());
+                MessageType::Bitfield { field }
+            } else {
+                println!("malformed message, clearing buffer");
+                buf.clear();
+                return None;
+            }
+        }
+    })
 }
 
 impl MessageType {

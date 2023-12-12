@@ -5,7 +5,7 @@
 //! parses the .torrent file
 //!
 
-use bendy::decoding::{Decoder, DictDecoder, Error, Object};
+use bendy::decoding::{Decoder, Object};
 use bendy::serde::from_bytes;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};

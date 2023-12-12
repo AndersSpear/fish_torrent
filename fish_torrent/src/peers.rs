@@ -17,6 +17,8 @@ use std::net::Shutdown;
 
 use anyhow::{Error, Result};
 
+use crate::p2p::Messages;
+
 #[derive(Debug)]
 pub struct Peer {
     peer_id: [u8; 20],
@@ -28,6 +30,7 @@ pub struct Peer {
     piece_bitfield: BitVec<u8, Msb0>,
     interested_bitfield: BitVec<u8, Msb0>,
     recv_buffer: Vec<u8>,
+    messages: Messages,
 }
 
 impl Peer {
@@ -42,6 +45,7 @@ impl Peer {
             piece_bitfield: BitVec::new(),
             interested_bitfield: BitVec::new(),
             recv_buffer: Vec::new(),
+            messages: Messages::default(),
         }
     }
 
@@ -65,6 +69,14 @@ impl Peer {
 
     pub fn get_mut_recv_buffer(&mut self) -> &mut Vec<u8> {
         &mut self.recv_buffer
+    }
+
+    pub fn get_mut_messages(&mut self) -> &mut Messages {
+        &mut self.messages
+    }
+
+    pub fn set_messages(&mut self, messages: Messages) {
+        self.messages = messages;
     }
 
     pub fn set_piece_bit(&mut self, index: usize) {
