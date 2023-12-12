@@ -69,6 +69,12 @@ pub fn send_all(peers: &mut Peers) -> Result<(), Error> {
 }
 
 impl Messages {
+    pub fn new() -> Self {
+        Messages {
+            messages: Vec::new(),
+        }
+    }
+
     /// can handle sending any type of message
     /// queues in some sort of send list
     fn send_messages(self, sock: &mut TcpStream) -> Result<(), Error> {
@@ -81,41 +87,41 @@ impl Messages {
         }
         Ok(())
     }
+}
 
-    //TODO look at types of send failures
-    /// called when socket triggers, pass in a peer that got triggered
-    pub fn handle_messages(peer: &mut Peer) -> Result<()> {
-        let mut return_msgs = Messages { messages: vec![] };
+//TODO look at types of send failures
+/// called when socket triggers, pass in a peer that got triggered
+pub fn handle_messages(peer: &mut Peer) -> Result<()> {
+    let mut return_msgs = Messages { messages: vec![] };
 
-        let mut local_buf = vec![];
-        let sock = peer.get_socket();
+    let mut local_buf = vec![];
+    let sock = peer.get_socket();
 
-        let readcount = match sock.read_to_end(&mut local_buf) {
-            Ok(n) => n,
-            Err(e) => {
-                println!("Error reading from socket: {}", e);
-                0
+    let readcount = match sock.read_to_end(&mut local_buf) {
+        Ok(n) => n,
+        Err(e) => {
+            println!("Error reading from socket: {}", e);
+            0
+        }
+    };
+    println!("read {} bytes from socket", readcount);
+
+    let mut buf = peer.get_mut_recv_buffer();
+    buf.append(&mut local_buf);
+
+    loop {
+        match parse_message(&mut buf) {
+            Some(msg) => {
+                return_msgs.messages.push(msg);
             }
-        };
-        println!("read {} bytes from socket", readcount);
-
-        let mut buf = peer.get_mut_recv_buffer();
-        buf.append(&mut local_buf);
-
-        loop {
-            match parse_message(&mut buf) {
-                Some(msg) => {
-                    return_msgs.messages.push(msg);
-                }
-                None => {
-                    break;
-                }
+            None => {
+                break;
             }
         }
-
-        peer.set_messages(return_msgs);
-        Ok(())
     }
+
+    peer.set_messages(return_msgs);
+    Ok(())
 }
 
 // TODO make sure this handles handshakes smile
@@ -134,10 +140,12 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
     //matching on the length
     //panics if first 4 bytes arent a big endian number!
     Some(match len {
+        // 0 length is a keep alive
         0 => {
             buf.drain(0..4);
             MessageType::KeepAlive
         }
+        // 1 length has 4 options (i guess could be a bitfield with no data but that would be weird and throwing it out is ok)
         1 => match buf[4] {
             0 => {
                 buf.drain(0..5);
@@ -162,6 +170,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
             }
         },
         n => {
+            // length 5 and messageID 4, must be a Have message
             if buf[4] == 4 && n == 5 {
                 let index = BigEndian::read_u32(&buf[5..9]);
                 buf.drain(0..9);
@@ -169,6 +178,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     index: index as usize,
                 }
             } else if (buf[4] == 8 || buf[4] == 6) && n == 13 {
+                // length 13 and messageID 6 or 8, must be a Request or Cancel message
                 let index = BigEndian::read_u32(&buf[5..9]);
                 let begin = BigEndian::read_u32(&buf[9..13]);
                 let length = BigEndian::read_u32(&buf[13..17]);
@@ -192,6 +202,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     }
                 }
             } else if (buf[4] == 7) && n > 9 {
+                // this is a piece message smile
                 let index = BigEndian::read_u32(&buf[5..9]);
                 let begin = BigEndian::read_u32(&buf[9..13]);
                 let block = buf[13..].to_vec();
@@ -203,6 +214,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     block,
                 }
             } else if (buf[4] == 5) && n > 5 {
+                //found a bitfield message
                 let field = BitVec::from_vec(buf[5..].to_vec());
                 buf.drain(0..5);
                 buf.drain(0..field.len());

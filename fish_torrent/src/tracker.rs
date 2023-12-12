@@ -3,6 +3,7 @@ use bendy::serde::from_bytes;
 //self contained code to interface with tracker
 //updates peers every interval
 use mio::net::TcpStream;
+use serde::{Deserialize, Serialize};
 use std::ascii::escape_default;
 use std::io::prelude::*;
 use urlencoding::encode;
@@ -18,13 +19,13 @@ use crate::torrent::*;
 pub struct TrackerResponseBeta {
     interval: u64,
     #[serde(with = "serde_bytes")]
-    peers: Vec<u8>,  // Assuming compact format
+    peers: Vec<u8>, // Assuming compact format
 }
 
 #[derive(Debug)]
 pub struct TrackerResponse {
     pub interval: u64,
-    pub socket_addr_list: Vec<SocketAddr>
+    pub socket_addr_list: Vec<SocketAddr>,
 }
 
 struct Peer {
@@ -105,9 +106,11 @@ pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> 
     match separator_pos {
         Some(pos) => {
             let body_bytes = &response[pos..];
-            println!("BODY_BYTES BRUH{}", String::from_utf8_lossy(body_bytes).to_string());
+            println!(
+                "BODY_BYTES BRUH{}",
+                String::from_utf8_lossy(body_bytes).to_string()
+            );
             Ok(body_bytes.to_vec())
-
         }
         None => Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -115,7 +118,6 @@ pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> 
         )),
     }
 }
-
 
 /// Sends a tracker request and returns the response as a Vec<u8>.
 ///
@@ -131,7 +133,7 @@ pub fn send_tracker_request(
     stream.flush()?;
     Ok(())
 }
-use bendy::decoding::{FromBencode, Error, Object};
+use bendy::decoding::{Error, FromBencode, Object};
 
 fn show(bs: &[u8]) -> String {
     let mut visible = String::new();
@@ -142,9 +144,9 @@ fn show(bs: &[u8]) -> String {
     visible
 }
 
-use bendy::decoding::{Decoder};
+use bendy::decoding::Decoder;
 use std::io::Cursor;
-use std::net::{Ipv4Addr, SocketAddr, IpAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /// Processes the HTTP response received from the tracker.
 ///
@@ -161,8 +163,8 @@ pub fn handle_tracker_response(
     //iterates through byte vector
     let body = parse_body_from_response(&response_data)?;
 
-
-    let trb = from_bytes::<TrackerResponseBeta>(body.as_slice()).expect("Decoding the .torrent failed");
+    let trb =
+        from_bytes::<TrackerResponseBeta>(body.as_slice()).expect("Decoding the .torrent failed");
     let mut sock_addr_list = Vec::new();
     for chunk in trb.peers.chunks_exact(6) {
         let ip_bytes = &chunk[0..4];
@@ -170,11 +172,13 @@ pub fn handle_tracker_response(
         let ip_addr = std::net::Ipv4Addr::from(<[u8; 4]>::try_from(ip_bytes).unwrap());
         let port = u16::from_be_bytes(<[u8; 2]>::try_from(port_bytes).unwrap());
 
-        
         let socket = SocketAddr::new(IpAddr::V4(ip_addr), port);
         sock_addr_list.push(socket);
     }
-    Ok(TrackerResponse { interval: trb.interval, socket_addr_list: sock_addr_list })
+    Ok(TrackerResponse {
+        interval: trb.interval,
+        socket_addr_list: sock_addr_list,
+    })
 }
 
 // fn parse_peers(peers_data: &[u8]) -> Result<Vec<Peer>, bendy::Error> {
@@ -239,10 +243,7 @@ mod tests {
         // let string_representation = String::from_utf8_lossy(&response).to_string();
         // println!("{}", &string_representation);
         // assert!(&string_representation.contains("interval"));
-
-
     }
-
 
     fn test_handle_tracker_response() {
         let tracker_request = TrackerRequest::new(
@@ -275,7 +276,7 @@ mod tests {
         //let response = send_tracker_request(&tracker_request, "poole.cs.umd.edu:6969").unwrap();
 
         //for s in &response {
-            //println!("{}", s);
+        //println!("{}", s);
         //}
 
         //test that the string representation of response contains 'interval'
@@ -284,13 +285,10 @@ mod tests {
         // assert!(&string_representation.contains("interval"));
 
         // let v = string_representation.clone();
-        
+
         //let parsed_message = handle_tracker_response(&response);
         // for s in parsed_message.unwrap() {
         //     println!("{}", s);
         // }
-
-
-
     }
 }
