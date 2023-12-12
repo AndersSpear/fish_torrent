@@ -19,10 +19,13 @@ use mio::{Events, Interest, Poll, Token};
 use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddrV4};
 use url::Url;
+use std::time::{Duration, Instant};
 
 use crate::peers::Peers;
 use crate::torrent::*;
 use crate::tracker::*;
+
+const STRATEGY_TIMEOUT: Duration = Duration::new(0, 100000000); // 100 milliseconds
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -63,10 +66,11 @@ fn main() {
     // read in torrent file
     parse_torrent_file(&args.file);
 
-    // uh ill fix this ignore for now
+    // parse that url and open the initial socket
+    // this blocks because wth are you gonna do while you wait for a response
     println!("{}", get_tracker_url());
     let mut tracker_sock = TcpStream::connect(
-        *Url::parse("http://128.8.126.63:6969/announce")
+        *Url::parse(get_tracker_url())
             .unwrap()
             .socket_addrs(|| None)
             .unwrap()
@@ -75,39 +79,45 @@ fn main() {
     )
     .expect("connect failed");
     const TRACKER: Token = Token(1);
-    let mut tracker_sock2 = TcpStream::from_std(
-        std::net::TcpStream::connect("128.8.126.63:6969").expect("connect failed"),
-    );
 
-    println!(
-        "addr {:?}\nuh: {:?}",
-        tracker_sock2.peer_addr(),
-        Url::parse("http://128.8.126.63:6969/announce")
-            .unwrap()
-            .socket_addrs(|| None)
-            .unwrap()
-            .first()
-            .unwrap()
-    );
-    // registers our tracker socket in the epoll
-    poll.registry()
-        .register(&mut tracker_sock2, TRACKER, Interest::READABLE)
-        .expect("tracker register failed");
+    // let mut tracker_sock2 = TcpStream::from_std(
+    //     std::net::TcpStream::connect("128.8.126.63:6969").expect("connect failed"),
+    // );
 
-    println!("urmo{}", get_tracker_url());
-    let tracker_request = TrackerRequest::new(
-        "aaaaaaaaaaaaaaaaaaaa",
-        "bbbbbbbbbbbbbbbbbbbb",
-        6881,
-        0,
-        0,
-        0,
-    );
+    // println!(
+    //     "addr {:?}\nuh: {:?}",
+    //     tracker_sock2.peer_addr(),
+    //     Url::parse("http://128.8.126.63:6969/announce")
+    //         .unwrap()
+    //         .socket_addrs(|| None)
+    //         .unwrap()
+    //         .first()
+    //         .unwrap()
+    // );
 
-    let response = send_tracker_request(&tracker_request, &mut tracker_sock2).unwrap();
-    // TODO: ask tracker.rs to talk with tracker
+    // set up the initial timers
+    let mut strategy_timer = Instant::now();
+    let mut tracker_timer = Instant::now();
+    let mut tracker_timeout: Duration = Duration::new(0, 0);
 
     loop {
+        // timer for blasting send
+        if strategy_timer.elapsed() > STRATEGY_TIMEOUT  {
+            // strategy::what_do(&mut peer_list);
+            // p2p::send_all(&mut peer_list);
+            strategy_timer = Instant::now();
+        }
+
+        // timer for blasting tracker
+        if tracker_timer.elapsed() > tracker_timeout  {
+
+            // registers our tracker socket in the epoll
+            poll.registry()
+                .register(&mut tracker_sock, TRACKER, Interest::WRITABLE)
+                .expect("tracker register failed");
+            tracker_timer = Instant::now();
+        }
+        
         poll.poll(&mut events, None).expect("poll_wait failed");
 
         for event in &events {
@@ -120,12 +130,24 @@ fn main() {
                     }
                 }
                 TRACKER => {
-                    println!("poggers we got a response");
-                    let x: TrackerResponse = tracker::handle_tracker_response(&response).expect("could not do it");
-                    dbg!(x);
-                    // handle_tracker_response();
-                    // what should the argument be?
-                    
+                    // is it a readable ?? (receive blasted message)
+                    if event.is_readable() {
+                        // handle_tracker_response(&mut tracker_sock);
+                        poll.registry().deregister(&mut tracker_sock);
+                    }
+                    // is it a writable ?? (blast message out)
+                    else if event.is_writable() {
+                        let tracker_request = TrackerRequest::new(
+                            "aaaaaaaaaaaaaaaaaaaa",
+                            "bbbbbbbbbbbbbbbbbbbb",
+                            6881,
+                            0,
+                            0,
+                            0,
+                        );
+                        send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
+                        poll.registry().reregister(&mut tracker_sock, TRACKER, Interest::READABLE);
+                    }
                 }
                 token => {
                     if let Some(socket) = sockets.get(&token) {
