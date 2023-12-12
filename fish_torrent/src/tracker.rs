@@ -25,6 +25,11 @@ pub struct TrackerResponse {
     pub socket_addr_list: Vec<SocketAddr>,
 }
 
+struct Peer {
+    ip: std::net::Ipv4Addr,
+    port: u16,
+}
+
 pub struct TrackerRequest {
     info_hash: String,
     peer_id: String,
@@ -32,15 +37,28 @@ pub struct TrackerRequest {
     uploaded: u64,
     downloaded: u64,
     left: u64,
+    event: Event,
 }
 
-struct Peer {
-    ip: std::net::Ipv4Addr,
-    port: u16,
+pub enum Event {
+    STARTED,
+    STOPPED,
+    COMPLETED,
+    PERIODIC,
+}
+
+impl Event {
+    fn as_str(&self) -> &str {
+        match self {
+            Event::STARTED => "started",
+            Event::STOPPED => "stopped",
+            Event::COMPLETED => "completed",
+            Event::PERIODIC => "periodic", // or an empty string if you prefer
+        }
+    }
 }
 
 impl TrackerRequest {
-    // Constructor to create a new TrackerRequest
     pub fn new(
         info_hash: &str,
         peer_id: &str,
@@ -48,6 +66,7 @@ impl TrackerRequest {
         uploaded: u64,
         downloaded: u64,
         left: u64,
+        event: Event,
     ) -> TrackerRequest {
         TrackerRequest {
             info_hash: info_hash.to_string(),
@@ -56,46 +75,22 @@ impl TrackerRequest {
             uploaded,
             downloaded,
             left,
+            event,
         }
     }
 
-    // Method to construct the tracker request URL
-    pub fn construct_request_url(&self) -> String {
+    pub fn construct_tracker_request(&self) -> String {
         let encoded_info_hash = encode(&self.info_hash);
         let encoded_peer_id = encode(&self.peer_id);
+        let event_str = self.event.as_str();
 
         format!(
-            "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
-            encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left
+            "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
+            encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
         )
     }
 }
 
-/// Constructs a tracker request URL with the given parameters.
-///
-/// # Arguments
-/// * `info_hash` - A 20-byte string representing the info hash.
-/// * `peer_id` - A 20-byte string representing the peer id.
-/// * `port` - The port number the client is listening on.
-/// * `uploaded` - The total amount uploaded so far.
-/// * `downloaded` - The total amount downloaded so far.
-/// * `left` - The total amount left to download.
-pub fn construct_tracker_request(
-    info_hash: &str,
-    peer_id: &str,
-    port: u16,
-    uploaded: u64,
-    downloaded: u64,
-    left: u64,
-) -> String {
-    let encoded_info_hash = encode(info_hash);
-    let encoded_peer_id = encode(peer_id);
-
-    format!(
-        "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
-        encoded_info_hash, encoded_peer_id, port, uploaded, downloaded, left
-    )
-}
 
 pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> {
     let separator_pos = response
@@ -127,7 +122,7 @@ pub fn send_tracker_request(
     tracker_request: &TrackerRequest,
     stream: &mut TcpStream,
 ) -> std::io::Result<()> {
-    let request = tracker_request.construct_request_url();
+    let request = TrackerRequest::construct_tracker_request(tracker_request);
     stream.write_all(request.as_bytes())?;
     stream.flush()?;
     Ok(())
@@ -204,14 +199,16 @@ mod tests {
 
     #[test]
     fn test_construct_tracker_request() {
-        let request = construct_tracker_request(
+        let tr = TrackerRequest::new(
             "aaaaaaaaaaaaaaaaaaaa",
             "bbbbbbbbbbbbbbbbbbbb",
             6881,
             0,
             0,
             0,
+            Event::STARTED
         );
+        let request = TrackerRequest::construct_tracker_request(&tr);
 
         assert!(request.contains("info_hash=aaaaaaaaaaaaaaaaaaaa"));
         assert!(request.contains("peer_id=bbbbbbbbbbbbbbbbbbbb"));
@@ -226,6 +223,7 @@ mod tests {
             0,
             0,
             0,
+            Event::STARTED
         );
 
         // this should only fail if the UMD server is down.
@@ -249,6 +247,7 @@ mod tests {
             0,
             0,
             0,
+            Event::STARTED
         );
 
         // this should only fail if the UMD server is down.
