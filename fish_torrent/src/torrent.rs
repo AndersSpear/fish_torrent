@@ -37,7 +37,7 @@ struct Torrent {
     #[serde(default)]
     info_hash: Vec<u8>, // 20 byte SHA1 hashvalue of the swarm
     #[serde(default)]
-    torrent_mode: TorrentMode, // single file or multiple file mode. tells you how to deal with the fields of Info (info.files or info.length and info.name)
+    torrent_mode: TorrentMode, // single file or multiple file mode. tells you how to deal with the fields of Info (info.files or info.)
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
@@ -88,15 +88,10 @@ pub fn parse_torrent_file(filename: &str) {
     let mut hash = Sha1::new();
     hash.update(infodata);
 
+    
     let torrent = Torrent {
         info_hash: hash.finalize().to_vec(),
-        torrent_mode: {
-            if torrent.info.files.len() > 0 {
-                TorrentMode::MultipleFile
-            } else {
-                TorrentMode::SingleFile
-            }
-        },
+        torrent_mode: {if torrent.info.files.len() > 0 {TorrentMode::MultipleFile} else {TorrentMode::SingleFile}},
         ..torrent
     };
 

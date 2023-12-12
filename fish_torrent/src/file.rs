@@ -56,10 +56,6 @@ impl OutputFile {
         }
     }
 
-    pub fn get_piece_bitfields(&self) -> &Vec<BitVec<u8, Msb0>> {
-        &self.pieces
-    }
-
     /// Writes a block (Vector) of bytes to the specified piece index and
     /// beginning offset.
     /// Returns true if this call to write_block finishes the piece specified by index.
@@ -137,7 +133,7 @@ impl OutputFile {
     }
 
     /// Check to see if the piece was finished.
-    pub fn is_piece_finished(&self, index: usize) -> Result<bool> {
+    fn is_piece_finished(&self, index: usize) -> Result<bool> {
         for i in 0..self.piece_size {
             let &bit = self.pieces[index].get(i).as_deref().expect(
                 "Unknown edge case where OutputFile.pieces was not
