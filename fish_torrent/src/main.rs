@@ -13,7 +13,6 @@ mod peers;
 mod strategy;
 mod torrent;
 mod tracker;
-mod strategy;
 
 use clap::Parser;
 use mio::net::{TcpListener, TcpStream};
