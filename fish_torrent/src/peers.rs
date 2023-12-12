@@ -13,7 +13,7 @@ use bitvec::prelude::*;
 use std::collections::HashMap;
 
 use mio::net::TcpStream;
-use std::net::Shutdown;
+use std::net::{SocketAddr, Shutdown};
 
 use anyhow::{Error, Result};
 
@@ -47,6 +47,10 @@ impl Peer {
             recv_buffer: Vec::new(),
             messages: Messages::new(),
         }
+    }
+
+    pub fn new_incomplete(socket: TcpStream) -> Self {
+        Self::new(&[0; 20], socket)
     }
 
     pub fn init_piece_bitfield(&mut self, bitfield: BitVec<u8, Msb0>) {
@@ -111,8 +115,8 @@ impl PartialEq for Peer {
 }
 
 pub struct Peers {
-    list: HashMap<[u8; 20], Peer>,
-    incomplete: HashMap<[u8; 20], Peer>,
+    list: HashMap<SocketAddr, Peer>,
+    incomplete: HashMap<SocketAddr, Peer>,
 }
 
 impl Peers {
@@ -127,9 +131,10 @@ impl Peers {
     /// The Peers struct will take ownership of the peer given.
     /// Additionally, it will return an Error if the peer id is already in the Peers struct.
     /// However, even on Error, ownership of the Peer will be taken.
-    pub fn add_peer(&mut self, peer: Peer) -> Result<()> {
-        if self.list.get(&peer.peer_id) == None {
-            self.list.insert(peer.peer_id, peer);
+    pub fn add_peer(&mut self, addr: SocketAddr, peer: Peer) -> Result<()> {
+        if self.list.contains_key(&addr) == false
+            && self.incomplete.contains_key(&addr) == false {
+            self.list.insert(addr, peer);
             Ok(())
         } else {
             Err(Error::msg(
@@ -138,16 +143,46 @@ impl Peers {
         }
     }
 
-    pub fn remove_peer(&mut self, peer: Peer) {
-        peer.disconnect();
-        self.list.remove(&peer.peer_id);
+    /// Removes a Peer from the Peers struct.
+    /// Returns the Peer that was removed for disconnecting.
+    pub fn remove_peer(&mut self, addr: SocketAddr) -> Option<Peer> {
+        self.list.remove(&addr)
     }
 
-    pub fn find_peer(&mut self, peer_id: [u8; 20]) -> Option<&mut Peer> {
-        self.list.get_mut(&peer_id)
+    pub fn add_incomplete_peer(&mut self, addr: SocketAddr, sock: TcpStream) -> Result<()> {
+        if self.list.contains_key(&addr) == false
+            && self.incomplete.contains_key(&addr) == false {
+            self.incomplete.insert(addr, Peer::new_incomplete(sock));
+            Ok(())
+        } else {
+            Err(Error::msg(
+                "peer's peer_id was already found in the Peers struct!",
+            ))
+        }
     }
 
-    pub fn get_peers_list(&mut self) -> &mut HashMap<[u8; 20], Peer> {
+    /// Takes in a peer_id to complete the peer and move it from
+    /// the Peers incomplete list to the complete list.
+    pub fn complete_peer(&mut self, addr: SocketAddr, peer_id: &[u8; 20]) -> Result<()> {
+        if self.list.contains_key(&addr) == false
+            && self.incomplete.contains_key(&addr) == true {
+            // Get peer off incomplete list.
+            let mut peer = self.incomplete.remove(&addr).unwrap();
+            // Complete it.
+            peer.peer_id = *peer_id;
+            // Add it to the complete list.
+            self.add_peer(addr, peer)?;
+            Ok(())
+        } else {
+            Err(Error::msg("I don't even know how you got to this state."))
+        }
+    }
+
+    pub fn find_peer(&mut self, addr: SocketAddr) -> Option<&mut Peer> {
+        self.list.get_mut(&addr)
+    }
+
+    pub fn get_peers_list(&mut self) -> &mut HashMap<SocketAddr, Peer> {
         &mut self.list
     }
 }
