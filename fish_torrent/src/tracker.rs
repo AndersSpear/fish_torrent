@@ -149,8 +149,6 @@ use std::net::{Ipv4Addr, SocketAddr, IpAddr};
 /// Processes the HTTP response received from the tracker.
 ///
 /// This function should parse the bencoded response and extract a list of peers.
-use std::fs::File;
-use std::io::{self, Write};
 
 pub fn handle_tracker_response(stream: &mut TcpStream) -> Result<TrackerResponse, bendy::decoding::Error> {
 
@@ -161,16 +159,7 @@ pub fn handle_tracker_response(stream: &mut TcpStream) -> Result<TrackerResponse
     // Find the position of the double CRLF separator
     //iterates through byte vector
     let body = parse_body_from_response(&response_data)?;
-    println!("start");
-    for x in &body {
-        println!("{}", x);
-    }
-    println!("end");
 
-    // Save body to a file
-    let file_path = "response_body.bin"; // Change this to your desired file path
-    let mut file = File::create(file_path).expect("Failed to create file");
-    file.write_all(&body).expect("Failed to write to file");
 
     let trb = from_bytes::<TrackerResponseBeta>(body.as_slice()).expect("Decoding the .torrent failed");
     let mut sock_addr_list = Vec::new();
