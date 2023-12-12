@@ -69,7 +69,7 @@ fn main() {
     // parse that url and open the initial socket
     // this blocks because wth are you gonna do while you wait for a response
     println!("{}", get_tracker_url());
-    let mut tracker_sock = TcpStream::connect(
+    let mut tracker_sock = TcpStream::from_std(std::net::TcpStream::connect(
         *Url::parse(get_tracker_url())
             .unwrap()
             .socket_addrs(|| None)
@@ -77,7 +77,7 @@ fn main() {
             .first()
             .unwrap(),
     )
-    .expect("connect failed");
+    .expect("connect failed"));
     const TRACKER: Token = Token(1);
 
     // let mut tracker_sock2 = TcpStream::from_std(
@@ -94,11 +94,14 @@ fn main() {
     //         .first()
     //         .unwrap()
     // );
+    poll.registry()
+        .register(&mut tracker_sock, TRACKER, Interest::WRITABLE)
+        .expect("tracker register failed");
 
     // set up the initial timers
     let mut strategy_timer = Instant::now();
     let mut tracker_timer = Instant::now();
-    let mut tracker_timeout: Duration = Duration::new(0, 0);
+    let mut tracker_timeout: Duration = Duration::new(1000000, 0);
 
     loop {
         // timer for blasting send
@@ -109,7 +112,7 @@ fn main() {
         }
 
         // timer for blasting tracker
-        if tracker_timer.elapsed() > tracker_timeout  {
+        if tracker_timer.elapsed() > tracker_timeout {
 
             // registers our tracker socket in the epoll
             poll.registry()
@@ -134,19 +137,20 @@ fn main() {
                     if event.is_readable() {
                         let tracker_response = tracker::handle_tracker_response(&mut tracker_sock).expect("tracker failed to read");
                         tracker_timeout = Duration::new(tracker_response.interval, 0);
+                        dbg!(tracker_response);
                         poll.registry().deregister(&mut tracker_sock).expect("tracker deregister fail");
                     }
                     // is it a writable ?? (blast message out)
                     else if event.is_writable() {
-                        let tracker_request = TrackerRequest::new(
-                            "aaaaaaaaaaaaaaaaaaaa",
-                            "bbbbbbbbbbbbbbbbbbbb",
-                            6881,
-                            0,
-                            0,
-                            0,
-                        );
-                        send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
+                        // let tracker_request = TrackerRequest::new(
+                        //     torrent::get_info_hash(),
+                        //     "bbbbbbbbbbbbbbbbbbbb",
+                        //     4170,
+                        //     0,
+                        //     0,
+                        //     0,
+                        // );
+                        // send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
                         poll.registry().reregister(&mut tracker_sock, TRACKER, Interest::READABLE).expect("tracker rereg fail");
                     }
                 }
