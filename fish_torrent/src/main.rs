@@ -144,6 +144,7 @@ fn main() {
                             0,
                             0,
                             0,
+                            Event::STARTED
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
                         poll.registry().reregister(&mut tracker_sock, TRACKER, Interest::READABLE).expect("tracker rereg fail");
