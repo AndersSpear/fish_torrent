@@ -18,10 +18,11 @@ use clap::Parser;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use std::collections::HashMap;
-use std::net::{self, Ipv4Addr, SocketAddrV4};
+use std::net::{self, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::{Duration, Instant};
 use url::Url;
 
+use crate::file::OutputFile;
 use crate::peers::Peers;
 use crate::torrent::*;
 use crate::tracker::*;
@@ -40,12 +41,31 @@ struct Args {
     #[arg(short, long)]
     file: String,
 }
+
+struct SelfInfo {
+    // TODO: trackerid ??
+    peer_id: [u8; 20],
+    port: u16,
+    uploaded: usize,
+    downloaded: usize,
+    left: usize,
+}
+
 /// main handles the initialization of stuff and keeping the event loop logic going
 fn main() {
     // you'll never guess what this line does
     let args = Args::parse();
+
+    // things i own :)
+    let mut self_info = SelfInfo {
+        peer_id: [0; 20],
+        port: args.port,
+        uploaded: 0,
+        downloaded: 0,
+        left: 0,
+    };
     let mut peer_list = Peers::new();
-    let mut sockets: HashMap<Token, TcpStream> = HashMap::new();
+    let mut sockets: HashMap<Token, SocketAddr> = HashMap::new();
 
     // binds to INADDR_ANY
     let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(
@@ -64,8 +84,10 @@ fn main() {
         .register(&mut serv_sock, SERVER, Interest::READABLE)
         .expect("serv register failed");
 
-    // read in torrent file
+    // read in torrent file:W
     parse_torrent_file(&args.file);
+
+    // let mut output_file = OutputFile::new(get_file_name(), get_number_of_pieces(), get_piece_length());
 
     // parse that url and open the initial socket
     // this blocks because wth are you gonna do while you wait for a response
@@ -104,7 +126,7 @@ fn main() {
     // set up the initial timers
     let mut strategy_timer = Instant::now();
     let mut tracker_timer = Instant::now();
-    let mut tracker_timeout: Duration = Duration::new(1000000, 0);
+    let mut tracker_timeout: Duration = Duration::new(std::u64::MAX, 0);
 
     loop {
         // timer for blasting send
@@ -123,8 +145,13 @@ fn main() {
             tracker_timer = Instant::now();
         }
 
-        poll.poll(&mut events, None).expect("poll_wait failed");
+        // calculate how much time is remaining for each of the timers
+        let strategy_remaining = STRATEGY_TIMEOUT - strategy_timer.elapsed();
+        let tracker_remaining = tracker_timeout - tracker_timer.elapsed();
+        poll.poll(&mut events, Some(strategy_remaining.min(tracker_remaining)))
+            .expect("poll_wait failed");
 
+        // who did something 
         for event in &events {
             match event.token() {
                 SERVER => {
@@ -149,11 +176,11 @@ fn main() {
                     else if event.is_writable() {
                         // let tracker_request = TrackerRequest::new(
                         //     torrent::get_info_hash(),
-                        //     "bbbbbbbbbbbbbbbbbbbb",
-                        //     4170,
-                        //     0,
-                        //     0,
-                        //     0,
+                        //     self_info.peer_id,
+                        //     self_info.port,
+                        //     self_info.uploaded,
+                        //     self_info.downloaded,
+                        //     self_info.left,
                         // );
                         // send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
                         poll.registry()
@@ -163,7 +190,7 @@ fn main() {
                 }
                 token => {
                     if let Some(socket) = sockets.get(&token) {
-                        handle_peer(&socket);
+                        // handle_peer(&socket);
                     } else {
                         println!("there is no socket associated with token {:#?}", token);
                     }
