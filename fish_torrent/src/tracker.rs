@@ -7,10 +7,12 @@ use std::ascii::escape_default;
 use std::io::prelude::*;
 use urlencoding::encode;
 use serde::{Deserialize, Serialize};
+use url::Url;
 // enum Peers {
 //     Compact(Vec<u8>),
 //     NonCompact(Vec<Peer>),
 // }
+use crate::torrent::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TrackerResponseBeta {
@@ -80,6 +82,7 @@ impl TrackerRequest {
     }
 
     pub fn construct_tracker_request(&self) -> String {
+        println!("in construct_tracker_request");
         let encoded_info_hash = encode(&self.info_hash);
         let encoded_peer_id = encode(&self.peer_id);
         let event_str = self.event.as_str();
@@ -93,6 +96,7 @@ impl TrackerRequest {
 
 
 pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> {
+    println!("in parse_body_from_response");
     let separator_pos = response
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
@@ -121,6 +125,7 @@ pub fn send_tracker_request(
     tracker_request: &TrackerRequest,
     stream: &mut TcpStream,
 ) -> std::io::Result<()> {
+    println!("in send_tracker_request");
     let request = TrackerRequest::construct_tracker_request(tracker_request);
     stream.write_all(request.as_bytes())?;
     stream.flush()?;
@@ -145,8 +150,9 @@ use std::net::{Ipv4Addr, SocketAddr, IpAddr};
 ///
 /// This function should parse the bencoded response and extract a list of peers.
 
-pub fn handle_tracker_response(stream: &mut TcpStream) -> Result<TrackerResponse, bendy::decoding::Error> {
-
+pub fn handle_tracker_response(
+    stream: &mut TcpStream,
+) -> Result<TrackerResponse, bendy::decoding::Error> {
     // Read the HTTP response
     let mut response_data = Vec::new();
     stream.read_to_end(&mut response_data)?;
@@ -248,6 +254,22 @@ mod tests {
             0,
             Event::STARTED
         );
+
+        let mut tracker_sock = TcpStream::from_std(
+            std::net::TcpStream::connect(
+                *Url::parse(get_tracker_url())
+                    .unwrap()
+                    .socket_addrs(|| None)
+                    .unwrap()
+                    .first()
+                    .unwrap(),
+            )
+            .expect("connect failed"),
+        );
+        send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
+        let tr = handle_tracker_response(&mut tracker_sock).unwrap();
+        
+        assert!(tr.socket_addr_list.len() >= 1);
 
         // this should only fail if the UMD server is down.
         //let response = send_tracker_request(&tracker_request, "poole.cs.umd.edu:6969").unwrap();
