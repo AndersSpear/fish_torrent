@@ -14,9 +14,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TrackerResponse {
-
     interval: i64,
-    peers: String  // Assuming compact format
+    peers: Vec<u8>  // Assuming compact format
 }
 
 pub struct TrackerRequest {
@@ -150,36 +149,24 @@ use std::net::Ipv4Addr;
 /// Processes the HTTP response received from the tracker.
 ///
 /// This function should parse the bencoded response and extract a list of peers.
+use std::fs::File;
+use std::io::{self, Write};
+
 pub fn handle_tracker_response(response_data: &Vec<u8>) -> Result<TrackerResponse, bendy::decoding::Error> {
     let body = parse_body_from_response(response_data)?;
-    //println!("Response Body: {}", show(body.as_slice()));
+    println!("start");
+    for x in &body {
+        println!("{}", x);
+    }
+    println!("end");
 
-    let mut decoder = Decoder::new(body.as_slice());
-    let infodata = 'outer: loop {
-        match decoder.next_object() {
-            Ok(Some(Object::Dict(mut d))) => loop {
-                match d.next_pair() {
-                    Ok(Some((b"interval", Object::Integer(d)))) => {
-                        break 'outer d;
-                    }
-                    Ok(Some((_, _))) => (),
-                    Ok(None) => break,
-                    Err(e) => panic!("meow trying to gety/decode infohash failed: {}", e),
-                }
-            },
-            _ => (),
-        }
-    };
+    // Save body to a file
+    let file_path = "response_body.bin"; // Change this to your desired file path
+    let mut file = File::create(file_path).expect("Failed to create file");
+    file.write_all(&body).expect("Failed to write to file");
 
-    println!("yay an int {}", infodata);
-
-
-    let response =
-    from_bytes::<TrackerResponse>(body.as_slice()).expect("decode response failed");
-    Ok(response)
-
-
-
+    let tr = from_bytes::<TrackerResponse>(body.as_slice()).expect("Decoding the .torrent failed");
+    Ok(tr)
 }
 
 // fn parse_peers(peers_data: &[u8]) -> Result<Vec<Peer>, bendy::Error> {
