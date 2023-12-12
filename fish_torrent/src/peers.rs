@@ -63,6 +63,10 @@ impl Peer {
         &mut self.socket
     }
 
+    pub fn get_mut_recv_buffer(&mut self) -> &mut Vec<u8> {
+        &mut self.recv_buffer
+    }
+
     pub fn set_piece_bit(&mut self, index: usize) {
         self.piece_bitfield.set(index, true);
     }
@@ -179,9 +183,7 @@ mod test {
     }
 
     #[test]
-    fn test_peer_piece_bit() {
-        
-    }
+    fn test_peer_piece_bit() {}
     #[test]
     fn test_peer_interested_bit() {}
     #[test]
