@@ -112,6 +112,7 @@ impl PartialEq for Peer {
 
 pub struct Peers {
     list: HashMap<[u8; 20], Peer>,
+    incomplete: HashMap<[u8; 20], Peer>,
 }
 
 impl Peers {
@@ -143,6 +144,10 @@ impl Peers {
 
     pub fn find_peer(&mut self, peer_id: [u8; 20]) -> Option<&mut Peer> {
         self.list.get_mut(&peer_id)
+    }
+
+    pub fn get_peers_list(&mut self) -> HashMap<> {
+        self.list
     }
 }
 
