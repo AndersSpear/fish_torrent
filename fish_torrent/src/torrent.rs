@@ -88,10 +88,15 @@ pub fn parse_torrent_file(filename: &str) {
     let mut hash = Sha1::new();
     hash.update(infodata);
 
-    
     let torrent = Torrent {
         info_hash: hash.finalize().to_vec(),
-        torrent_mode: {if torrent.info.files.len() > 0 {TorrentMode::MultipleFile} else {TorrentMode::SingleFile}},
+        torrent_mode: {
+            if torrent.info.files.len() > 0 {
+                TorrentMode::MultipleFile
+            } else {
+                TorrentMode::SingleFile
+            }
+        },
         ..torrent
     };
 

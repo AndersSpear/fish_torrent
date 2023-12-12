@@ -27,8 +27,8 @@ pub struct Peer {
     am_interested: bool,
     peer_choking: bool,
     peer_interested: bool,
-    piece_bitfield: BitVec<u8, Msb0>,
-    interested_bitfield: BitVec<u8, Msb0>,
+    piece_bitfield: BitVec<u8, Msb0>, // what pieces they said they have
+    interested_bitfield: BitVec<u8, Msb0>, // what pieces they said they want
     recv_buffer: Vec<u8>,
     messages: Messages,
 }

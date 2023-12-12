@@ -177,7 +177,8 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                 MessageType::Have {
                     index: index as usize,
                 }
-            } else if (buf[4] == 8 || buf[4] == 6) && n == 13 { // length 13 and messageID 6 or 8, must be a Request or Cancel message
+            } else if (buf[4] == 8 || buf[4] == 6) && n == 13 {
+                // length 13 and messageID 6 or 8, must be a Request or Cancel message
                 let index = BigEndian::read_u32(&buf[5..9]);
                 let begin = BigEndian::read_u32(&buf[9..13]);
                 let length = BigEndian::read_u32(&buf[13..17]);
@@ -200,8 +201,8 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                         return None;
                     }
                 }
-                
-            } else if (buf[4] == 7) && n > 9 {// this is a piece message smile
+            } else if (buf[4] == 7) && n > 9 {
+                // this is a piece message smile
                 let index = BigEndian::read_u32(&buf[5..9]);
                 let begin = BigEndian::read_u32(&buf[9..13]);
                 let block = buf[13..].to_vec();
@@ -212,7 +213,8 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     begin: begin as usize,
                     block,
                 }
-            } else if (buf[4] == 5) && n > 5 { //found a bitfield message
+            } else if (buf[4] == 5) && n > 5 {
+                //found a bitfield message
                 let field = BitVec::from_vec(buf[5..].to_vec());
                 buf.drain(0..5);
                 buf.drain(0..field.len());
