@@ -17,6 +17,7 @@ mod tracker;
 use clap::Parser;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
+use peers::Peer;
 use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::{Duration, Instant};
@@ -194,7 +195,7 @@ fn main() {
                 }
                 token => {
                     if let Some(socket) = sockets.get(&token) {
-                        // handle_peer(&socket);
+                        handle_peer(sockets.get(&token).unwrap());
                     } else {
                         println!("there is no socket associated with token {:#?}", token);
                     }
@@ -208,24 +209,31 @@ fn main() {
 fn add_all_peers(poll: &mut Poll, peer_list: &mut Peers, sockets: &mut HashMap<Token, SocketAddr>, tracker_response: TrackerResponse) {
 
     // each peer is a SockAddr initially
-    for peer in tracker_response.socket_addr_list {
-
-        // let mut socket = TcpStream::connect(peer data)?;
-        // let peer = Peer::new(peerid, stream);
-
-        // if peer_list.add_peer(peer) == false {
-
-        //     error or seomthign idk
-        // }
-
-        // let token = get_new_token();
-        // poll.registry().register(&mut socket, token, Interest::READABLE)?;
-        // sockets.insert(get_new_token, peer_list.find_peer(peerid).unwrap().get_socket());
+    for peer_addr in tracker_response.socket_addr_list {
+        if let Ok(mut socket) = TcpStream::connect(peer_addr) {
+            // add peer ?? ?? ?? (is it there already !! ??)
+            if let Ok(&mut socket) = peer_list.add_incomplete_peer(peer_addr, socket) {
+                let token = get_new_token();
+                poll.registry().register(&mut socket, token, Interest::READABLE);
+                sockets.insert(token, peer_addr);
+            }
+            else {
+                println!("already connected to peer {:?}", peer_addr);
+            }
+        }
+        else {
+            println!("failed to connect to peer {:?}", peer_addr);
+        }
     }
 }
 
+fn get_new_token() -> Token {
+    static TOKEN_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(2);
+    Token(TOKEN_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+}
+
 /// handles the message it got from a peer
-fn handle_peer(socket: &TcpStream) {
+fn handle_peer(peer_addr: &SocketAddr) {
     // handle_message(socket);
     // match () {
     //     Choke => {
