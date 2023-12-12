@@ -45,7 +45,7 @@ impl Peer {
             piece_bitfield: BitVec::new(),
             interested_bitfield: BitVec::new(),
             recv_buffer: Vec::new(),
-            messages: Messages::default(),
+            messages: Messages::new(),
         }
     }
 
@@ -119,6 +119,7 @@ impl Peers {
     pub fn new() -> Self {
         Peers {
             list: HashMap::new(),
+            incomplete: HashMap::new(),
         }
     }
 
@@ -146,8 +147,8 @@ impl Peers {
         self.list.get_mut(&peer_id)
     }
 
-    pub fn get_peers_list(&mut self) -> HashMap<> {
-        self.list
+    pub fn get_peers_list(&mut self) -> &mut HashMap<[u8; 20], Peer> {
+        &mut self.list
     }
 }
 
