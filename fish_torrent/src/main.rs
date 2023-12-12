@@ -166,8 +166,12 @@ fn main() {
                     if event.is_readable() {
                         let tracker_response = tracker::handle_tracker_response(&mut tracker_sock)
                             .expect("tracker failed to read");
+                        dbg!(&tracker_response);
+                        
+                        // yay we got a full response, time to do things :)
                         tracker_timeout = Duration::new(tracker_response.interval, 0);
-                        dbg!(tracker_response);
+                        add_all_peers(&mut poll, &mut peer_list, &mut sockets, tracker_response);
+
                         poll.registry()
                             .deregister(&mut tracker_sock)
                             .expect("tracker deregister fail");
@@ -197,44 +201,27 @@ fn main() {
                 }
             }
         }
-        // match listener.accept() {
-        //     Ok((_socket, addr)) => println!("new client: {addr:?}"),
-        //     Err(e) => println!("couldn't get client: {e:?}"),
-        // }
-
-        // epollwait();
-        // for(events) {
-        //     if(tracker_interval){
-        //         update_tracker();
-        //     }
-        //     if(tracker_response){
-        //         handle_tracker_response();
-        //     }
-        //     if(peer_response){
-        //         handle_peer_response();
-        //     }
-        // }
     }
 }
 
-/// handles the response the tracker got, creates new peers for all the peers it received if needed
-fn handle_tracker_response() {
-    //     get "list" of peer metadata
+/// handles the response the tracker got, aka creates new peers for all the peers it received if needed
+fn add_all_peers(poll: &mut Poll, peer_list: &mut Peers, sockets: &mut HashMap<Token, SocketAddr>, tracker_response: TrackerResponse) {
 
-    //     foreach peer data {
+    // each peer is a SockAddr initially
+    for peer in tracker_response.socket_addr_list {
 
-    //         let mut socket = TcpStream::connect(peer data)?;
-    //         let peer = Peer::new(peerid, stream);
+        // let mut socket = TcpStream::connect(peer data)?;
+        // let peer = Peer::new(peerid, stream);
 
-    //         if peer_list.add_peer(peer) == false {
+        // if peer_list.add_peer(peer) == false {
 
-    //             error or seomthign idk
-    //         }
+        //     error or seomthign idk
+        // }
 
-    //         let token = get_new_token();
-    //         poll.registry().register(&mut socket, token, Interest::READABLE)?;
-    //         sockets.insert(get_new_token, peer_list.find_peer(peerid).unwrap().get_socket());
-    //     }
+        // let token = get_new_token();
+        // poll.registry().register(&mut socket, token, Interest::READABLE)?;
+        // sockets.insert(get_new_token, peer_list.find_peer(peerid).unwrap().get_socket());
+    }
 }
 
 /// handles the message it got from a peer
