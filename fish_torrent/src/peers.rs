@@ -49,7 +49,7 @@ impl Peer {
         }
     }
 
-    pub fn new_incomplete(socket: TcpStream) -> Self {
+    fn new_incomplete(socket: TcpStream) -> Self {
         Self::new(&[0; 20], socket)
     }
 
