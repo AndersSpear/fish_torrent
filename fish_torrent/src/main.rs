@@ -132,7 +132,8 @@ fn main() {
                 TRACKER => {
                     // is it a readable ?? (receive blasted message)
                     if event.is_readable() {
-                        let ret = tracker::handle_tracker_response(&mut tracker_sock).expect("tracker failed to read");
+                        let tracker_response = tracker::handle_tracker_response(&mut tracker_sock).expect("tracker failed to read");
+                        tracker_timeout = Duration::new(tracker_response.interval, 0);
                         poll.registry().deregister(&mut tracker_sock).expect("tracker deregister fail");
                     }
                     // is it a writable ?? (blast message out)
