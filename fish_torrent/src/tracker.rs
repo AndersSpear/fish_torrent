@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TrackerResponseBeta {
-    interval: i64,
+    interval: u64,
     #[serde(with = "serde_bytes")]
     peers: Vec<u8>,  // Assuming compact format
 }
 
 #[derive(Debug)]
 pub struct TrackerResponse {
-    pub interval: i64,
+    pub interval: u64,
     pub socket_addr_list: Vec<SocketAddr>
 }
 
