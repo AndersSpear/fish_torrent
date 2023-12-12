@@ -11,7 +11,7 @@ use sha1::{Digest, Sha1};
 
 use anyhow::{Error, Result};
 
-struct OutputFile {
+pub struct OutputFile {
     file: File,
     // The two fields below are technically redundant but eh.
     num_pieces: usize,
