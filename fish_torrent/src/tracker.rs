@@ -125,18 +125,11 @@ pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> 
 pub fn send_tracker_request(
     tracker_request: &TrackerRequest,
     stream: &mut TcpStream,
-) -> std::io::Result<Vec<u8>> {
+) -> std::io::Result<()> {
     let request = tracker_request.construct_request_url();
     stream.write_all(request.as_bytes())?;
     stream.flush()?;
-
-    // Read the HTTP response
-    let mut response = Vec::new();
-    stream.read_to_end(&mut response)?;
-
-    // Find the position of the double CRLF separator
-    //iterates through byte vector
-    Ok(response)
+    Ok(())
 }
 use bendy::decoding::{FromBencode, Error, Object};
 
@@ -159,8 +152,15 @@ use std::net::{Ipv4Addr, SocketAddr, IpAddr};
 use std::fs::File;
 use std::io::{self, Write};
 
-pub fn handle_tracker_response(response_data: &Vec<u8>) -> Result<TrackerResponse, bendy::decoding::Error> {
-    let body = parse_body_from_response(response_data)?;
+pub fn handle_tracker_response(stream: &mut TcpStream) -> Result<TrackerResponse, bendy::decoding::Error> {
+
+    // Read the HTTP response
+    let mut response_data = Vec::new();
+    stream.read_to_end(&mut response_data)?;
+
+    // Find the position of the double CRLF separator
+    //iterates through byte vector
+    let body = parse_body_from_response(&response_data)?;
     println!("start");
     for x in &body {
         println!("{}", x);
