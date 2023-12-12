@@ -81,41 +81,41 @@ impl Messages {
         }
         Ok(())
     }
+}
 
-    //TODO look at types of send failures
-    /// called when socket triggers, pass in a peer that got triggered
-    pub fn handle_messages(peer: &mut Peer) -> Result<()> {
-        let mut return_msgs = Messages { messages: vec![] };
+//TODO look at types of send failures
+/// called when socket triggers, pass in a peer that got triggered
+pub fn handle_messages(peer: &mut Peer) -> Result<()> {
+    let mut return_msgs = Messages { messages: vec![] };
 
-        let mut local_buf = vec![];
-        let sock = peer.get_socket();
+    let mut local_buf = vec![];
+    let sock = peer.get_socket();
 
-        let readcount = match sock.read_to_end(&mut local_buf) {
-            Ok(n) => n,
-            Err(e) => {
-                println!("Error reading from socket: {}", e);
-                0
+    let readcount = match sock.read_to_end(&mut local_buf) {
+        Ok(n) => n,
+        Err(e) => {
+            println!("Error reading from socket: {}", e);
+            0
+        }
+    };
+    println!("read {} bytes from socket", readcount);
+
+    let mut buf = peer.get_mut_recv_buffer();
+    buf.append(&mut local_buf);
+
+    loop {
+        match parse_message(&mut buf) {
+            Some(msg) => {
+                return_msgs.messages.push(msg);
             }
-        };
-        println!("read {} bytes from socket", readcount);
-
-        let mut buf = peer.get_mut_recv_buffer();
-        buf.append(&mut local_buf);
-
-        loop {
-            match parse_message(&mut buf) {
-                Some(msg) => {
-                    return_msgs.messages.push(msg);
-                }
-                None => {
-                    break;
-                }
+            None => {
+                break;
             }
         }
-
-        peer.set_messages(return_msgs);
-        Ok(())
     }
+
+    peer.set_messages(return_msgs);
+    Ok(())
 }
 
 // TODO make sure this handles handshakes smile
