@@ -93,17 +93,26 @@ fn main() {
     // parse that url and open the initial socket
     // this blocks because wth are you gonna do while you wait for a response
     println!("{}", get_tracker_url());
-    let mut tracker_sock = TcpStream::from_std(
-        std::net::TcpStream::connect(
-            *Url::parse(get_tracker_url())
-                .unwrap()
-                .socket_addrs(|| None)
-                .unwrap()
-                .first()
-                .unwrap(),
-        )
-        .expect("connect failed"),
-    );
+    // let mut tracker_sock = TcpStream::from_std(
+    //     std::net::TcpStream::connect(
+    //         *Url::parse(get_tracker_url())
+    //             .unwrap()
+    //             .socket_addrs(|| None)
+    //             .unwrap()
+    //             .first()
+    //             .unwrap(),
+    //     )
+    //     .expect("connect failed"),
+    // );
+    let mut tracker_sock = TcpStream::connect(
+        *Url::parse(get_tracker_url())
+            .unwrap()
+            .socket_addrs(|| None)
+            .unwrap()
+            .first()
+            .unwrap(),
+    )
+    .expect("connect failed");
     const TRACKER: Token = Token(1);
 
     // let mut tracker_sock2 = TcpStream::from_std(
@@ -134,14 +143,28 @@ fn main() {
 
     loop {
         // timer for blasting send
-        if strategy_timer.elapsed() > STRATEGY_TIMEOUT {
+        if strategy_timer.elapsed() >= STRATEGY_TIMEOUT {
+            dbg!("strategy timeout occurred !!");
             // strategy::what_do(&mut peer_list);
             // p2p::send_all(&mut peer_list);
             strategy_timer = Instant::now();
         }
 
         // timer for blasting tracker
-        if tracker_timer.elapsed() > tracker_timeout {
+        if tracker_timer.elapsed() >= tracker_timeout {
+            dbg!("tracker timeout occurred !!");
+
+            // we simply reconnect to the tracker
+            tracker_sock = TcpStream::connect(
+                *Url::parse(get_tracker_url())
+                    .unwrap()
+                    .socket_addrs(|| None)
+                    .unwrap()
+                    .first()
+                    .unwrap(),
+            )
+            .expect("connect failed");
+
             // registers our tracker socket in the epoll
             poll.registry()
                 .register(&mut tracker_sock, TRACKER, Interest::WRITABLE)
@@ -157,9 +180,10 @@ fn main() {
 
         // who did something
         for event in &events {
-            dbg!("event llopp");
+            dbg!(format!("event llopp with event {:?}", event));
             match event.token() {
                 SERVER => {
+                    dbg!("server socket activity");
                     if let Ok((socket, peer_addr)) = serv_sock.accept() {
                         println!("new client: {peer_addr:?}");
 
@@ -178,10 +202,15 @@ fn main() {
                     }
                 }
                 TRACKER => {
+                    dbg!("tracker socket activity");
                     // is it a readable ?? (receive blasted message)
                     if event.is_readable() {
                         dbg!("readable");
-                        let (data, response) = tracker::handle_tracker_response(partial_tracker_data, &mut tracker_sock);
+                        let (data, response) = tracker::handle_tracker_response(
+                            partial_tracker_data,
+                            &mut tracker_sock,
+                        );
+                        println!("bald");
                         dbg!(&data);
                         dbg!(&response);
                         partial_tracker_data = data;
@@ -189,28 +218,35 @@ fn main() {
                         match response {
                             Some(tracker_response) => {
                                 // yay we got a full response, time to do things :)
-                                tracker_timeout = Duration::new(tracker_response.interval, 0);
-                                add_all_peers(&mut poll, &mut peer_list, &mut sockets, tracker_response);
+                                tracker_timeout =
+                                    Duration::new(tracker_response.interval.try_into().unwrap(), 0);
+                                add_all_peers(
+                                    &mut poll,
+                                    &mut peer_list,
+                                    &mut sockets,
+                                    tracker_response,
+                                );
 
                                 poll.registry()
                                     .deregister(&mut tracker_sock)
                                     .expect("tracker deregister fail");
                             }
                             None => {
-                                // cringe !!! 727 WYSI !!! (it was 7:27 at the time of writing this code) 
+                                // cringe !!! 727 WYSI !!! (it was 7:27 at the time of writing this code)
                             }
                         }
-
                     }
                     // is it a writable ?? (blast message out)
                     else if event.is_writable() {
                         let tracker_request = TrackerRequest::new(
                             "aaaaaaaaaaaaaaaaaaaa",
-                            self_info.peer_id,
+                            // self_info.peer_id,
+                            "bbbbbbbbbbbbbbbbbbbb",
                             self_info.port,
                             self_info.uploaded,
                             self_info.downloaded,
                             self_info.left,
+                            Event::STARTED,
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
                         poll.registry()

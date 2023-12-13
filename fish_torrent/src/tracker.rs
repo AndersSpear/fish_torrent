@@ -143,17 +143,17 @@ use bendy::decoding::Decoder;
 use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-
 pub fn get_tracker_response_from_vec_u8(buf: &Vec<u8>) -> TrackerResponse {
-    //if Ok, we have received n bytes and placed into response_data. 
+    //if Ok, we have received n bytes and placed into response_data.
     // then, we process.
-    // if err, 
+    // if err,
 
     //put it into response_data
 
     // Find the position of the double CRLF separator
     //iterates through byte vector
-    let body = parse_body_from_response(buf).expect("parse_body_from_response in get_tracker_from_response fail");
+    let body = parse_body_from_response(buf)
+        .expect("parse_body_from_response in get_tracker_from_response fail");
 
     let trb =
         from_bytes::<TrackerResponseBeta>(body.as_slice()).expect("Decoding the .torrent failed");
@@ -190,7 +190,7 @@ pub fn handle_tracker_response(
             let tr = get_tracker_response_from_vec_u8(&buf);
             buf.clear();
             return (buf, Some(tr));
-        },
+        }
         Err(e) => {
             //instantly leave
             dbg!("tracker partial read occurred");
@@ -287,8 +287,9 @@ mod tests {
             .expect("connect failed"),
         );
 
-        send_tracker_request(&tracker_request, &mut tracker_sock).expect("could not send_tracker_request");
-        let tr = handle_tracker_response(vec![],&mut tracker_sock);
+        send_tracker_request(&tracker_request, &mut tracker_sock)
+            .expect("could not send_tracker_request");
+        let tr = handle_tracker_response(vec![], &mut tracker_sock);
         match tr {
             (vec, Some(tr)) => {
                 dbg!(&tr.socket_addr_list);
