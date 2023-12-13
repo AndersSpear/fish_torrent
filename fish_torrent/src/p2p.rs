@@ -188,57 +188,74 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
         },
         n => {
             dbg!(buf[4]);
-            // length 5 and messageID 4, must be a Have message
-            if buf[4] == 4 && n == 5 {
-                let index = BigEndian::read_u32(&buf[5..9]);
-                buf.drain(0..9);
-                MessageType::Have { index }
-            } else if (buf[4] == 8 || buf[4] == 6) && n == 13 {
-                // length 13 and messageID 6 or 8, must be a Request or Cancel message
-                let index = BigEndian::read_u32(&buf[5..9]);
-                let begin = BigEndian::read_u32(&buf[9..13]);
-                let length = BigEndian::read_u32(&buf[13..17]);
-                buf.drain(0..17);
-
-                match buf[4] {
-                    6 => MessageType::Request {
-                        index,
-                        begin,
-                        length,
-                    },
-                    8 => MessageType::Cancel {
-                        index,
-                        begin,
-                        length,
-                    },
-                    _ => {
-                        println!("malformed message, clearing buffer");
-                        buf.clear();
+            match buf[4] {
+                4 => {
+                    if n == 5 {
+                        let index = BigEndian::read_u32(&buf[5..9]);
+                        buf.drain(0..9);
+                        MessageType::Have { index }
+                    } else {
                         return None;
                     }
                 }
-            } else if (buf[4] == 7) && n > 9 {
-                // this is a piece message smile
-                let index = BigEndian::read_u32(&buf[5..9]);
-                let begin = BigEndian::read_u32(&buf[9..13]);
-                let block = buf[13..].to_vec();
-                buf.drain(0..13);
-                buf.drain(0..block.len());
-                MessageType::Piece {
-                    index,
-                    begin,
-                    block,
+                5 => {
+                    let field = BitVec::from_vec(buf[5..].to_vec());
+                    buf.drain(0..5);
+                    buf.drain(0..field.len());
+                    MessageType::Bitfield { field }
                 }
-            } else if (buf[4] == 5) && n > 5 {
-                //found a bitfield message
-                let field = BitVec::from_vec(buf[5..].to_vec());
-                buf.drain(0..5);
-                buf.drain(0..field.len());
-                MessageType::Bitfield { field }
-            } else {
-                println!("malformed message, clearing buffer");
-                buf.clear();
-                return None;
+                6 => {
+                    if n != 13 {
+                        return None;
+                    };
+                    // length 13 and messageID 6 or 8, must be a Request or Cancel message
+                    let index = BigEndian::read_u32(&buf[5..9]);
+                    let begin = BigEndian::read_u32(&buf[9..13]);
+                    let length = BigEndian::read_u32(&buf[13..17]);
+                    buf.drain(0..17);
+
+                    MessageType::Request {
+                        index,
+                        begin,
+                        length,
+                    }
+                }
+                7 => {
+                    if n <= 9 {
+                        return None;
+                    };
+                    let index = BigEndian::read_u32(&buf[5..9]);
+                    let begin = BigEndian::read_u32(&buf[9..13]);
+                    let block = buf[13..].to_vec();
+                    buf.drain(0..13);
+                    buf.drain(0..block.len());
+                    MessageType::Piece {
+                        index,
+                        begin,
+                        block,
+                    }
+                }
+                8 => {
+                    if n != 13 {
+                        return None;
+                    };
+                    // length 13 and messageID 6 or 8, must be a Request or Cancel message
+                    let index = BigEndian::read_u32(&buf[5..9]);
+                    let begin = BigEndian::read_u32(&buf[9..13]);
+                    let length = BigEndian::read_u32(&buf[13..17]);
+                    buf.drain(0..17);
+
+                    MessageType::Cancel {
+                        index,
+                        begin,
+                        length,
+                    }
+                }
+                _ => {
+                    println!("malformed message id, clearing buffer");
+                    buf.clear();
+                    return None;
+                }
             }
         }
     })
