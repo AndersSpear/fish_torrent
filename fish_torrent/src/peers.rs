@@ -13,7 +13,7 @@ use bitvec::prelude::*;
 use std::collections::HashMap;
 
 use mio::net::TcpStream;
-use std::net::{SocketAddr, Shutdown};
+use std::net::{Shutdown, SocketAddr};
 
 use anyhow::{Error, Result};
 
@@ -132,10 +132,13 @@ impl Peers {
     /// Additionally, it will return an Error if the peer id is already in the Peers struct.
     /// However, even on Error, ownership of the Peer will be taken.
     pub fn add_peer(&mut self, addr: SocketAddr, peer: Peer) -> Result<&mut TcpStream> {
-        if self.list.contains_key(&addr) == false
-            && self.incomplete.contains_key(&addr) == false {
+        if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == false {
             self.list.insert(addr, peer);
-            Ok(self.list.get_mut(&addr).expect("Uhhh contact tien").get_mut_socket())
+            Ok(self
+                .list
+                .get_mut(&addr)
+                .expect("Uhhh contact tien")
+                .get_mut_socket())
         } else {
             Err(Error::msg(
                 "peer's peer_id was already found in the Peers struct!",
@@ -149,11 +152,18 @@ impl Peers {
         self.list.remove(&addr)
     }
 
-    pub fn add_incomplete_peer(&mut self, addr: SocketAddr, sock: TcpStream) -> Result<&mut TcpStream> {
-        if self.list.contains_key(&addr) == false
-            && self.incomplete.contains_key(&addr) == false {
+    pub fn add_incomplete_peer(
+        &mut self,
+        addr: SocketAddr,
+        sock: TcpStream,
+    ) -> Result<&mut TcpStream> {
+        if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == false {
             self.incomplete.insert(addr, Peer::new_incomplete(sock));
-            Ok(self.incomplete.get_mut(&addr).expect("Uhhh contact tien").get_mut_socket())
+            Ok(self
+                .incomplete
+                .get_mut(&addr)
+                .expect("Uhhh contact tien")
+                .get_mut_socket())
         } else {
             Err(Error::msg(
                 "peer's peer_id was already found in the Peers struct!",
@@ -164,8 +174,7 @@ impl Peers {
     /// Takes in a peer_id to complete the peer and move it from
     /// the Peers incomplete list to the complete list.
     pub fn complete_peer(&mut self, addr: SocketAddr, peer_id: &[u8; 20]) -> Result<()> {
-        if self.list.contains_key(&addr) == false
-            && self.incomplete.contains_key(&addr) == true {
+        if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == true {
             // Get peer off incomplete list.
             let mut peer = self.incomplete.remove(&addr).unwrap();
             // Complete it.
