@@ -42,7 +42,7 @@ pub struct TrackerRequest {
     event: Event,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum Event {
     STARTED,
     STOPPED,
@@ -224,7 +224,7 @@ fn update_tracker() {
     // TODO: Implement periodic updates to the tracker here.
 }
 
-fn bytes_to_urlencoding(bytes: &[u8]) -> String {
+pub fn bytes_to_urlencoding(bytes: &[u8]) -> String {
     let mut res = String::new();
     for b in bytes {
         res.push_str(&format!("%{:02X}", b));

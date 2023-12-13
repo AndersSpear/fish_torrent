@@ -15,6 +15,7 @@ mod torrent;
 mod tracker;
 
 use clap::Parser;
+use mio::event::Source;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use peers::Peer;
@@ -222,6 +223,7 @@ fn main() {
                                 // yay we got a full response, time to do things :)
                                 tracker_timeout =
                                     Duration::new(tracker_response.interval.try_into().unwrap(), 0);
+                                    // Duration::new(10, 0);
                                 
                                 // if let Some(tracker_id) = tracker_response.tracker_id {
                                 //     self_info.tracker_id = tracker_response.tracker_id;
@@ -234,9 +236,12 @@ fn main() {
                                     tracker_response,
                                 );
 
+
                                 poll.registry()
                                     .deregister(&mut tracker_sock)
                                     .expect("tracker deregister fail");
+                                
+                                // tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was shutdown :D");
                             }
                             None => {
                                 // cringe !!! 727 WYSI !!! (it was 7:27 at the time of writing this code)
@@ -245,9 +250,11 @@ fn main() {
                     }
                     // is it a writable ?? (blast message out)
                     else if event.is_writable() {
+                        dbg!(get_info_hash());
+                        dbg!(tracker::bytes_to_urlencoding(&get_info_hash()));
                         let tracker_request = TrackerRequest::new(
                             get_info_hash(),
-                            self_info.peer_id,
+                            &self_info.peer_id.to_vec(),
                             self_info.port,
                             self_info.uploaded,
                             self_info.downloaded,
@@ -272,7 +279,7 @@ fn main() {
                         let peer_addr = sockets.remove(&token).unwrap();
                         let peer = peer_list.remove_peer(peer_addr).unwrap();
                         // you cant shutdown a non connected socket (as we have figured out very quickly)
-                        if event.is_read_closed() {
+                        if !event.is_error() {
                             peer.disconnect(); 
                         }
                         continue;
