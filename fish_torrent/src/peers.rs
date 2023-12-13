@@ -17,7 +17,14 @@ use std::net::{Shutdown, SocketAddr};
 
 use anyhow::{Error, Result};
 
-use crate::p2p::Messages;
+use super::p2p::Messages;
+
+#[derive(PartialEq, Debug)]
+pub struct Request {
+    pub index: usize,
+    pub begin: usize,
+    pub length: usize,
+}
 
 #[derive(Debug)]
 pub struct Peer {
@@ -28,7 +35,7 @@ pub struct Peer {
     peer_choking: bool,
     peer_interested: bool,
     piece_bitfield: BitVec<u8, Msb0>, // what pieces they said they have
-    interested_bitfield: BitVec<u8, Msb0>, // what pieces they said they want
+    piece_requests: Vec<Request>,     // what pieces they said they want
     recv_buffer: Vec<u8>,
     messages: Messages,
 }
@@ -43,7 +50,7 @@ impl Peer {
             peer_choking: true,
             peer_interested: false,
             piece_bitfield: BitVec::new(),
-            interested_bitfield: BitVec::new(),
+            piece_requests: Vec::new(),
             recv_buffer: Vec::new(),
             messages: Messages::new(),
         }
@@ -55,10 +62,6 @@ impl Peer {
 
     pub fn init_piece_bitfield(&mut self, bitfield: BitVec<u8, Msb0>) {
         self.piece_bitfield = bitfield;
-    }
-
-    pub fn init_interested_bitfield(&mut self, bitfield: BitVec<u8, Msb0>) {
-        self.interested_bitfield = bitfield;
     }
 
     pub fn disconnect(&self) {
@@ -91,12 +94,16 @@ impl Peer {
         self.piece_bitfield.set(index, false);
     }
 
-    pub fn set_interested_bit(&mut self, index: usize) {
-        self.interested_bitfield.set(index, true);
+    pub fn push_request(&mut self, index: usize, begin: usize, length: usize) {
+        self.piece_requests.push(Request {
+            index,
+            begin,
+            length,
+        })
     }
 
-    pub fn unset_interested_bit(&mut self, index: usize) {
-        self.interested_bitfield.set(index, false);
+    pub fn pop_request(&mut self) -> Option<Request> {
+        self.piece_requests.pop()
     }
 }
 
@@ -109,7 +116,7 @@ impl PartialEq for Peer {
             && self.peer_choking == other.peer_choking
             && self.peer_interested == other.peer_interested
             && self.piece_bitfield == other.piece_bitfield
-            && self.interested_bitfield == other.interested_bitfield
+            && self.piece_requests == other.piece_requests
         // anders - i did not add recv_buffer to this because fuck that
     }
 }
@@ -151,8 +158,7 @@ impl Peers {
     pub fn remove_peer(&mut self, addr: SocketAddr) -> Option<Peer> {
         if self.list.contains_key(&addr) == true {
             self.list.remove(&addr)
-        }
-        else {
+        } else {
             self.incomplete.remove(&addr)
         }
     }
