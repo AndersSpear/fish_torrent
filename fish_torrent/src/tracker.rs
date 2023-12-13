@@ -194,7 +194,7 @@ pub fn handle_tracker_response(
         },
         Err(e) => {
             //instantly leave
-            println!("error: {}", e);
+            dbg!("tracker partial read occurred");
             return (buf, None);
         }
     };
