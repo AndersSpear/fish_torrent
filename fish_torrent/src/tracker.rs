@@ -62,8 +62,8 @@ impl Event {
 
 impl TrackerRequest {
     pub fn new(
-        info_hash: Vec<u8>,
-        peer_id: Vec<u8>,
+        info_hash: &Vec<u8>,
+        peer_id: &Vec<u8>,
         port: u16,
         uploaded: usize,
         downloaded: usize,
@@ -71,8 +71,8 @@ impl TrackerRequest {
         event: Event,
     ) -> TrackerRequest {
         TrackerRequest {
-            info_hash: bytes_to_urlencoding(&info_hash),
-            peer_id: bytes_to_urlencoding(&peer_id),
+            info_hash: bytes_to_urlencoding(info_hash),
+            peer_id: bytes_to_urlencoding(peer_id),
             port,
             uploaded,
             downloaded,
