@@ -422,18 +422,18 @@ mod test {
         #[test]
         fn test_p2p_handshakes() {
             // Set up networking.
-            let (self_sock, mut other_sock) = networking_setup(8001);
+            let (mut self_sock, mut other_sock) = networking_setup(8001);
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut peer = Peer::new(self_sock);
+            //let mut peer = Peer::new(self_sock);
             let mut other_peer = Peer::new(other_sock);
-            let get_sock = peer.get_mut_socket();
+            //let get_sock = peer.get_mut_socket();
 
             //init torrent struct with infohash
             torrent::parse_torrent_file("../artofwar.torrent");
 
-            let file = File::new("p2p.rs.test", 5, 5);
+            let file = OutputFile::new("p2p.rs.test", 5, 5).unwrap();
             //send handshake
             send_handshake(&mut other_peer, &[b'a'; 20], &file).unwrap();
             //recv handshake
