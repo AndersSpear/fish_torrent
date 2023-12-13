@@ -22,7 +22,7 @@ use anyhow::{Error, Result};
 
 #[derive(Debug, Default, Clone)]
 pub struct Messages {
-    messages: Vec<MessageType>,
+    pub messages: Vec<MessageType>,
 }
 
 /// A little added enum with associated data structs from Tien :)
