@@ -30,20 +30,20 @@ pub struct Request {
 pub struct Peer {
     peer_id: [u8; 20],
     socket: TcpStream,
-    am_choking: bool,
-    am_interested: bool,
-    peer_choking: bool,
-    peer_interested: bool,
+    pub am_choking: bool,
+    pub am_interested: bool,
+    pub peer_choking: bool,
+    pub peer_interested: bool,
     piece_bitfield: BitVec<u8, Msb0>, // what pieces they said they have
     piece_requests: Vec<Request>,     // what pieces they said they want
-    recv_buffer: Vec<u8>,
-    messages: Messages,
+    pub recv_buffer: Vec<u8>,
+    pub messages: Messages,
 }
 
 impl Peer {
-    pub fn new(peer_id: &[u8; 20], socket: TcpStream) -> Self {
+    pub fn new(peer_id: Option<&[u8; 20]>, socket: TcpStream) -> Self {
         Self {
-            peer_id: peer_id.clone(),
+            peer_id: if let Some(id) = peer_id { *id } else { [0; 20] },
             socket,
             am_choking: true,
             am_interested: false,
@@ -56,9 +56,9 @@ impl Peer {
         }
     }
 
-    fn new_incomplete(socket: TcpStream) -> Self {
-        Self::new(&[0; 20], socket)
-    }
+    //fn new_incomplete(socket: TcpStream) -> Self {
+    //    Self::new(&[0; 20], socket)
+    //}
 
     pub fn init_piece_bitfield(&mut self, bitfield: BitVec<u8, Msb0>) {
         self.piece_bitfield = bitfield;
@@ -71,6 +71,26 @@ impl Peer {
 
     pub fn get_mut_socket(&mut self) -> &mut TcpStream {
         &mut self.socket
+    }
+
+    pub fn set_piece_bit(&mut self, index: usize, status: bool) {
+        self.piece_bitfield.set(index, status);
+    }
+
+    pub fn push_request(&mut self, index: usize, begin: usize, length: usize) {
+        self.piece_requests.push(Request {
+            index,
+            begin,
+            length,
+        })
+    }
+
+    pub fn pop_request(&mut self) -> Option<Request> {
+        self.piece_requests.pop()
+    }
+    
+    pub fn remove_request(&mut self) -> Option<Request> {
+        unimplemented!();
     }
 
     pub fn get_mut_recv_buffer(&mut self) -> &mut Vec<u8> {
@@ -91,26 +111,6 @@ impl Peer {
 
     pub fn set_messages(&mut self, messages: Messages) {
         self.messages = messages;
-    }
-
-    pub fn set_piece_bit(&mut self, index: usize) {
-        self.piece_bitfield.set(index, true);
-    }
-
-    pub fn unset_piece_bit(&mut self, index: usize) {
-        self.piece_bitfield.set(index, false);
-    }
-
-    pub fn push_request(&mut self, index: usize, begin: usize, length: usize) {
-        self.piece_requests.push(Request {
-            index,
-            begin,
-            length,
-        })
-    }
-
-    pub fn pop_request(&mut self) -> Option<Request> {
-        self.piece_requests.pop()
     }
 }
 
@@ -145,14 +145,41 @@ impl Peers {
     /// The Peers struct will take ownership of the peer given.
     /// Additionally, it will return an Error if the peer id is already in the Peers struct.
     /// However, even on Error, ownership of the Peer will be taken.
-    pub fn add_peer(&mut self, addr: SocketAddr, peer: Peer) -> Result<&mut TcpStream> {
+    //pub fn add_peer(&mut self, addr: SocketAddr, peer: Peer) -> Result<&mut TcpStream> {
+    //    if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == false {
+    //        self.list.insert(addr, peer);
+    //        Ok(self
+    //            .list
+    //            .get_mut(&addr)
+    //            .expect("Uhhh contact tien")
+    //            .get_mut_socket())
+    //    } else {
+    //        Err(Error::msg(
+    //            "peer's peer_id was already found in the Peers struct!",
+    //        ))
+    //    }
+    //}
+    pub fn add_peer(
+        &mut self,
+        addr: SocketAddr,
+        sock: TcpStream,
+        peer_id: Option<&[u8; 20]>,
+    ) -> Result<&mut Peer> {
         if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == false {
-            self.list.insert(addr, peer);
-            Ok(self
-                .list
-                .get_mut(&addr)
-                .expect("Uhhh contact tien")
-                .get_mut_socket())
+            let new_peer = Peer::new(peer_id, sock);
+            if peer_id == None {
+                self.incomplete.insert(addr, new_peer);
+                Ok(self
+                    .incomplete
+                    .get_mut(&addr)
+                    .expect("This should not have occurred."))
+            } else {
+                self.list.insert(addr, new_peer);
+                Ok(self
+                    .list
+                    .get_mut(&addr)
+                    .expect("This should not have occurred."))
+            }
         } else {
             Err(Error::msg(
                 "peer's peer_id was already found in the Peers struct!",
@@ -170,35 +197,46 @@ impl Peers {
         }
     }
 
-    pub fn add_incomplete_peer(
-        &mut self,
-        addr: SocketAddr,
-        sock: TcpStream,
-    ) -> Result<&mut TcpStream> {
-        if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == false {
-            self.incomplete.insert(addr, Peer::new_incomplete(sock));
-            Ok(self
-                .incomplete
-                .get_mut(&addr)
-                .expect("Uhhh contact tien")
-                .get_mut_socket())
-        } else {
-            Err(Error::msg(
-                "peer's peer_id was already found in the Peers struct!",
-            ))
-        }
-    }
+    //pub fn add_incomplete_peer(
+    //    &mut self,
+    //    addr: SocketAddr,
+    //    sock: TcpStream,
+    //) -> Result<&mut TcpStream> {
+    //    if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == false {
+    //        self.incomplete.insert(addr, Peer::new_incomplete(sock));
+    //        Ok(self
+    //            .incomplete
+    //            .get_mut(&addr)
+    //            .expect("Uhhh contact tien")
+    //            .get_mut_socket())
+    //    } else {
+    //        Err(Error::msg(
+    //            "peer's peer_id was already found in the Peers struct!",
+    //        ))
+    //    }
+    //}
 
-    /// Takes in a peer_id to complete the peer and move it from
-    /// the Peers incomplete list to the complete list.
+    /// Takes in a peer_id to complete the peer stored in the Peers struct.
+    /// Will throw an error if the peer was already complete or if there
+    /// was no peer to complete using the given addr.
+    //pub fn complete_peer(&mut self, addr: SocketAddr, peer_id: &[u8; 20]) -> Result<()> {
+    //    if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == true {
+    //        // Get peer off incomplete list.
+    //        let mut peer = self.incomplete.remove(&addr).unwrap();
+    //        // Complete it.
+    //        peer.peer_id = *peer_id;
+    //        // Add it to the complete list.
+    //        self.add_peer(addr, peer)?;
+    //        Ok(())
+    //    } else {
+    //        Err(Error::msg("I don't even know how you got to this state."))
+    //    }
+    //}
     pub fn complete_peer(&mut self, addr: SocketAddr, peer_id: &[u8; 20]) -> Result<()> {
-        if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == true {
-            // Get peer off incomplete list.
-            let mut peer = self.incomplete.remove(&addr).unwrap();
-            // Complete it.
+        if self.incomplete.contains_key(&addr) == true && self.list.contains_key(&addr) == false {
+            let peer = self.incomplete.remove(&addr).unwrap();
             peer.peer_id = *peer_id;
-            // Add it to the complete list.
-            self.add_peer(addr, peer)?;
+            self.list.insert(addr, peer);
             Ok(())
         } else {
             Err(Error::msg("I don't even know how you got to this state."))
@@ -206,7 +244,11 @@ impl Peers {
     }
 
     pub fn find_peer(&mut self, addr: SocketAddr) -> Option<&mut Peer> {
-        self.list.get_mut(&addr)
+        let mut res = self.list.get_mut(&addr);
+        if res == None {
+            res = self.incomplete.get_mut(&addr)
+        }
+        res
     }
 
     pub fn get_peers_list(&mut self) -> &mut HashMap<SocketAddr, Peer> {
