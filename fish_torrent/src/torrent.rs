@@ -114,7 +114,6 @@ pub fn parse_torrent_file(filename: &str) {
     // println!("infohash: {:?}\n", TORRENT.get().unwrap().info_hash);
 }
 
-
 pub fn get_file_name() -> &'static str {
     &TORRENT.get().unwrap().info.name
 }

@@ -25,6 +25,7 @@ use std::time::{Duration, Instant};
 use url::Url;
 
 use crate::file::OutputFile;
+use crate::p2p::MessageType;
 use crate::peers::Peers;
 use crate::torrent::*;
 use crate::tracker::*;
@@ -92,8 +93,12 @@ fn main() {
     // read in torrent file:W
     parse_torrent_file(&args.file);
 
-    // TODO bug anders
-    let mut output_file = OutputFile::new(get_file_name(), get_number_of_pieces(), get_piece_length());
+    let mut output_file = OutputFile::new(
+        get_file_name(),
+        get_number_of_pieces().try_into().unwrap(),
+        get_piece_length().try_into().unwrap(),
+    )
+    .unwrap();
 
     // parse that url and open the initial socket
     // this blocks because wth are you gonna do while you wait for a response
@@ -240,7 +245,7 @@ fn main() {
                                 poll.registry()
                                     .deregister(&mut tracker_sock)
                                     .expect("tracker deregister fail");
-                                
+
                                 // tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was not shutdown :(");
                             }
                             None => {
@@ -287,7 +292,7 @@ fn main() {
 
                     // lets see what they said to us
                     if let Some(&peer_addr) = sockets.get(&token) {
-                        handle_peer(peer_list.find_peer(peer_addr).unwrap(), output_file);
+                        handle_peer(peer_list.find_peer(peer_addr).unwrap(), &mut output_file);
                     } else {
                         println!("there is no socket associated with token {:?}", token);
                     }
@@ -336,44 +341,45 @@ fn get_new_token() -> Token {
 fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
     dbg!(format!("handling peer {:?}", peer));
     p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
-    // TODO: should remove peer if error reading? (question mark?)
-    for msg in peer.get_mut_messages() { // implement iterator madge ! (or give me access or something)
-        dbg!(format!("message is {}", msg));
-        match (msg) {
-            Choke => {
-                peer.set_peer_choking(true);
+                                                                 // TODO: should remove peer if error reading? (question mark?)
+    for msg in peer.get_mut_messages().messages {
+        // implement iterator madge ! (or give me access or something)
+        dbg!(format!("message is {:?}", msg));
+        match msg {
+            MessageType::Choke => {
+                peer.peer_choking = true;
             }
-            Unchoke => {
-                peer.set_peer_choking(false);
+            MessageType::Unchoke => {
+                peer.peer_choking = false;
             }
-            Interested => {
-                peer.set_peer_interested(true);
+            MessageType::Interested => {
+                peer.peer_interested = true;
             }
-            NotInterested => {
-                peer.set_peer_interested(false);
+            MessageType::NotInterested => {
+                peer.peer_interested = false;
             }
-            Have(index) => {
-                peer.set_piece_bit(index);
+            MessageType::Have{index} => {
+                peer.set_piece_bit(index.try_into().unwrap());
             }
-            Bitfield(field) => {
+            MessageType::Bitfield{field} => {
                 peer.init_piece_bitfield(field);
             }
-            Request(index, begin, length) => {
+            MessageType::Request{index, begin, length} => {
                 // check if we are choking them? or do we just send?
             }
-            Piece(index, begin, block) => {
-                output_file.write_block(index, begin, block);
+            MessageType::Piece{index, begin, block} => {
+                output_file.write_block(index.try_into().unwrap(), begin.try_into().unwrap(), block);
             }
-            Cancel(index, begin, length) => {
+            MessageType::Cancel{index, begin, length} => {
                 // remove them as being interested ??
             }
-            KeepAlive => {
+            MessageType::KeepAlive => {
                 // uh i dont htink we do anything hrere
             }
             Undefined => {
                 // does this still exist questio mark
             }
-            HandshakeResponse => {
+            MessageType::HandshakeResponse => {
                 // do i care?
             }
         }

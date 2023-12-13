@@ -131,7 +131,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
 /// tries to parse one message from the buffer
 fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
     dbg!(buf.len());
-    
+
     if buf.len() < 4 {
         dbg!("less than 4 bytes in buffer");
         return None;
@@ -301,22 +301,19 @@ fn send_have(sock: &mut TcpStream, index: u32) -> Result<(), Error> {
 }
 
 fn send_bitfield(sock: &mut TcpStream, mut field: BitVec<u8, Msb0>) -> Result<(), Error> {
+    //bitvec manipulation
+    field.force_align();
+    field.set_uninitialized(false);
 
-        //bitvec manipulation
-        field.force_align();
-        field.set_uninitialized(false);
-    
-        //dbg!(&field);
-        let vecfield = field.into_vec();
+    //dbg!(&field);
+    let vecfield = field.into_vec();
 
     // TODO make sure length is in bytes not bits
     let length = vecfield.len() as u32;
 
-    
     let mut buf = vec![0; 5];
     buf[0..4].copy_from_slice(&(length + 1).to_be_bytes());
     buf[4] = 5; // message id 5 is bitfield
-
 
     buf.extend(vecfield);
     sock.write_all(&buf)?;
@@ -508,7 +505,6 @@ mod test {
         }
     }
 
-
     rusty_fork_test! {
         #[test]
         fn test_send_recv_have() {
@@ -663,7 +659,6 @@ mod test {
             assert_eq!(recieved_messages.messages[0], cancel);
         }
     }
-    
 
     rusty_fork_test! {
         #[test]
@@ -721,7 +716,6 @@ mod test {
         }
     }
 
-
     rusty_fork_test! {
         #[test]
         fn test_send_recv_unchoke() {
@@ -765,13 +759,13 @@ mod test {
 
             let interested = MessageType::Interested;
             sender.get_mut_messages().messages.push(interested.clone());
-            
+
             let messages = sender.get_messages_clone();
             sender.reset_messages();
-            
+
             let get_sock = sender.get_mut_socket();
             messages.send_messages(get_sock).unwrap();
-            
+
             handle_messages(&mut reciever).unwrap();
             let recieved_messages = reciever.get_messages_clone();
             assert_eq!(recieved_messages.messages[0], interested);
@@ -783,7 +777,7 @@ mod test {
         fn test_send_recv_not_interested() {
             // Set up networking.
             let (self_sock, other_sock) = networking_setup(8014);
-            
+
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
             let mut sender = Peer::new(self_sock);
@@ -793,13 +787,13 @@ mod test {
 
             let not_interested = MessageType::NotInterested;
             sender.get_mut_messages().messages.push(not_interested.clone());
-            
+
             let messages = sender.get_messages_clone();
             sender.reset_messages();
-            
+
             let get_sock = sender.get_mut_socket();
             messages.send_messages(get_sock).unwrap();
-            
+
             handle_messages(&mut reciever).unwrap();
             let recieved_messages = reciever.get_messages_clone();
             assert_eq!(recieved_messages.messages[0], not_interested);
@@ -872,7 +866,7 @@ mod test {
             handle_messages(&mut reciever).unwrap();
             let recieved_messages = reciever.get_messages_clone();
             dbg!(reciever.get_mut_messages());
-            
+
             assert_eq!(recieved_messages.messages[0], choke);
             assert_eq!(recieved_messages.messages[1], unchoke);
             assert_eq!(recieved_messages.messages[2], interested);
@@ -881,7 +875,7 @@ mod test {
             assert_eq!(recieved_messages.messages[5], bitfield);
             assert_eq!(recieved_messages.messages[6], request);
             assert_eq!(recieved_messages.messages[7], piece);
-            assert_eq!(recieved_messages.messages[8], cancel);  
+            assert_eq!(recieved_messages.messages[8], cancel);
             assert_eq!(recieved_messages.messages[9], keep_alive);
             assert_eq!(recieved_messages.messages.len(), 10);
 
