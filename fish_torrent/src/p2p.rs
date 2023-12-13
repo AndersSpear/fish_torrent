@@ -5,7 +5,8 @@
 //! call send_all(peers) for sending to all peers
 //! call handle_messages(peer) for recieving from one peer
 //! call send_handshake(sock, my_id) to send a handshake to a peer
-//! call
+//! call recv_handshake(peer)
+use crate::file::OutputFile;
 use crate::peers::{Peer, Peers};
 
 use crate::torrent;
@@ -356,13 +357,20 @@ fn send_piece(sock: &mut TcpStream, index: u32, begin: u32, block: Vec<u8>) -> R
 //TODO make sure alex is okay calling handshake separatley than the rest of the messages
 /// called right after we created a new peer
 /// sends the initial handshake
-pub fn send_handshake(sock: &mut TcpStream, my_id: &[u8; 20]) -> Result<()> {
+pub fn send_handshake(peer: &mut Peer, my_id: &[u8; 20], file: &OutputFile) -> Result<()> {
+    let sock = peer.get_mut_socket();
     let mut buf: Vec<u8> = vec![0; 68];
     buf[0] = 19;
     buf[1..20].copy_from_slice(b"BitTorrent protocol");
     buf[28..48].copy_from_slice(&torrent::get_info_hash());
     buf[48..68].copy_from_slice(my_id);
     sock.write_all(&buf)?;
+
+
+    //TODO GET THE BITFIELD
+    peer.messages.messages.push(MessageType::Bitfield { field: file.get_file_bitfield()  });
+
+
     Ok(())
 }
 
@@ -422,7 +430,7 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut peer = Peer::new(&[b'a'; 20], self_sock);
+            let mut peer = Peer::new(self_sock);
             let get_sock = peer.get_mut_socket();
 
             //init torrent struct with infohash
@@ -431,9 +439,7 @@ mod test {
             //send handshake
             send_handshake(&mut other_sock, &[b'a'; 20]).unwrap();
             //recv handshake
-            dbg!(recv_handshake(&mut peer).unwrap());
-
-
+            recv_handshake(&mut peer).unwrap();
         }
     }
 
@@ -446,7 +452,7 @@ mod test {
 
            // Create a peer, give it the TcpStream, and then see if the stream
            // can be written to and read from.
-           let mut sender = Peer::new(&[b'a'; 20], self_sock);
+           let mut sender = Peer::new(self_sock);
 
            torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -510,8 +516,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -538,8 +544,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -569,8 +575,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -601,8 +607,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -633,8 +639,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -666,8 +672,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -694,8 +700,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -723,8 +729,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -751,8 +757,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
             
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -779,8 +785,8 @@ mod test {
             
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
             
             torrent::parse_torrent_file("../artofwar.torrent");
 
@@ -807,8 +813,8 @@ mod test {
 
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
-            let mut sender = Peer::new(&[b'a'; 20], self_sock);
-            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            let mut sender = Peer::new(self_sock);
+            let mut reciever = Peer::new(other_sock);
 
 
             torrent::parse_torrent_file("../artofwar.torrent");

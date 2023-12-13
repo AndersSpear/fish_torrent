@@ -6,15 +6,20 @@
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
 
+use crate::file::OutputFile;
 use crate::p2p::Messages;
 use crate::peers::Peers;
 
-/// gives a list of messages that need to be sent out
-pub fn what_do(peers: &mut Peers, we_have: &Vec<BitVec<u8, Msb0>>) -> Vec<Messages> {
-    unimplemented!();
+pub struct StratStruct{
+    
 }
 
-/// tell strategy what didnt get sent out,
-pub fn these_didnt_happen(messages: Vec<Messages>) {
-    unimplemented!();
+
+impl StratStruct{
+    pub fn new() -> StratStruct{
+        unimplemented!();
+    }
+    pub fn what_do(self, peers: &mut Peers, file:&OutputFile) -> StratStruct{
+        unimplemented!();
+    }
 }
