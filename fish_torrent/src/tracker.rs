@@ -62,8 +62,8 @@ impl Event {
 
 impl TrackerRequest {
     pub fn new(
-        info_hash: &str,
-        peer_id: &str,
+        info_hash: [u8; 20],
+        peer_id: [u8; 20],
         port: u16,
         uploaded: usize,
         downloaded: usize,
@@ -71,8 +71,8 @@ impl TrackerRequest {
         event: Event,
     ) -> TrackerRequest {
         TrackerRequest {
-            info_hash: info_hash.to_string(),
-            peer_id: peer_id.to_string(),
+            info_hash: bytes_to_urlencoding(&info_hash),
+            peer_id: bytes_to_urlencoding(&peer_id),
             port,
             uploaded,
             downloaded,
@@ -82,13 +82,15 @@ impl TrackerRequest {
     }
 
     pub fn construct_tracker_request(&self) -> String {
-        let encoded_info_hash = encode(&self.info_hash);
-        let encoded_peer_id = encode(&self.peer_id);
+        // Tien removed these because info_hash and peer_id are encoding in new() now.
+        //let encoded_info_hash = encode(&self.info_hash);
+        //let encoded_peer_id = encode(&self.peer_id);
         let event_str = self.event.as_str();
 
         format!(
             "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
-            encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
+            //encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
+            self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
         )
     }
 }
@@ -217,10 +219,17 @@ fn update_tracker() {
     // TODO: Implement periodic updates to the tracker here.
 }
 
+fn bytes_to_urlencoding(bytes: &[u8]) -> String {
+    let mut res = String::new();
+    for b in bytes {
+        res.push_str(&format!("%{:02X}", b));
+    }
+    res
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_construct_tracker_request() {
         let tr = TrackerRequest::new(
@@ -318,5 +327,12 @@ mod tests {
         // for s in parsed_message.unwrap() {
         //     println!("{}", s);
         // }
+    }
+
+    #[test]
+    fn test_bytes_to_urlencoding() {
+        let res = bytes_to_urlencoding(&[0x05, 0x61, 0x61, 0x61, 0xc3, 0xb5]);
+        assert_eq!("%05%61%61%61%C3%B5", res);
+        dbg!(res);
     }
 }
