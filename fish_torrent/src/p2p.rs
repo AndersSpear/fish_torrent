@@ -99,13 +99,20 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
     let mut local_buf = vec![];
     let sock = peer.get_mut_socket();
 
-    let readcount = match sock.read_to_end(&mut local_buf) {
-        Ok(n) => n,
-        Err(e) => {
-            println!("Error reading from socket: {}", e);
-            0
+    //let readcount = match sock.read_to_end(&mut local_buf) {
+    //    Ok(n) => n,
+    //    Err(e) => {
+    //        println!("Error reading from socket: {}", e);
+    //        0
+    //    }
+    //};
+    if let Err(e) = sock.read_to_end(&mut local_buf) {
+        // If the expect WouldBlock for partial read does not occur,
+        // then some other IO error occurred!
+        if e.kind() != std::io::ErrorKind::WouldBlock {
+            return Err(e.into());
         }
-    };
+    }
     println!("read {} bytes from socket", local_buf.len());
 
     let mut buf = &mut peer.recv_buffer;
@@ -416,6 +423,18 @@ mod test {
         .unwrap();
         let (other_sock, _) = serv_sock.accept().unwrap();
         (self_sock, other_sock)
+    }
+
+    #[test]
+    fn fuck_you() {
+        let (mut self_sock, mut other_sock) = networking_setup(1090);
+        dbg!(other_sock.write(b"hello").unwrap());
+        let mut buf = Vec::new();
+        match self_sock.read_to_end(&mut buf) {
+            Ok(_) => dbg!("sweet"),
+            Err(e) => if e.kind() == std::io::ErrorKind::WouldBlock { dbg!("dude") }
+                        else { dbg!("fuck") },
+        };
     }
 
     rusty_fork_test! {
