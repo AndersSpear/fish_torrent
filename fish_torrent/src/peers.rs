@@ -226,7 +226,7 @@ mod test {
         // Create a peer, give it the TcpStream, and then see if the stream
         // can be written to and read from.
         let mut peer = Peer::new(&[b'a'; 20], self_sock);
-        let get_sock = peer.get_socket();
+        let get_sock = peer.get_mut_socket();
 
         // Write
         let string = b"test";
