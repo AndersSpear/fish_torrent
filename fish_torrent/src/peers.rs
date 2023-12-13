@@ -65,8 +65,7 @@ impl Peer {
     }
 
     pub fn disconnect(&self) -> Result<()> {
-        self.socket
-            .shutdown(Shutdown::Both)?;
+        self.socket.shutdown(Shutdown::Both)?;
         Ok(())
     }
 

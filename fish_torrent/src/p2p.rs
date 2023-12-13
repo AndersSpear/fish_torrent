@@ -2,6 +2,10 @@
 #![warn(missing_docs)]
 //! this is responsible for low level p2p communication
 //! send messages to peers, recieve messages from peers, does not handle the logic of what to do with the messages.
+//! call send_all(peers) for sending to all peers
+//! call handle_messages(peer) for recieving from one peer
+//! call send_handshake(sock, my_id) to send a handshake to a peer
+//! call 
 use crate::peers::Peers;
 
 use super::peers::Peer;
@@ -10,13 +14,12 @@ use bitvec::prelude::*;
 
 use byteorder::ByteOrder;
 use mio::net::TcpStream;
-use std::io::Error;
 use std::io::Read;
 use std::io::Write;
 
 use byteorder::BigEndian;
 
-use anyhow::Result;
+use anyhow::{Result, Error};
 
 #[derive(Debug, Default)]
 pub struct Messages {
@@ -55,7 +58,6 @@ pub enum MessageType {
     KeepAlive, // KeepAlive is last because it does not have an associated
     // id in the protocol. This way choke starts at id 0.
     //Port // DHT Tracker is not supported, so this msg is not handled.
-    Handshake,
 }
 
 /// sends all messages in the peers struct
@@ -273,7 +275,6 @@ impl MessageType {
             MessageType::KeepAlive => {
                 sock.write_all(&[0; 4])?;
             }
-            MessageType::Handshake => send_handshake(sock)?,
         }
         Ok(())
     }
@@ -346,14 +347,114 @@ fn send_piece(
     Ok(())
 }
 
+//TODO make sure alex is okay calling handshake separatley than the rest of the messages
 /// called right after we created a new peer
 /// sends the initial handshake
-pub fn send_handshake(sock: &mut TcpStream) -> Result<(), Error> {
+pub fn send_handshake(sock: &mut TcpStream, my_id: &[u8; 20]) -> Result<()> {
     let mut buf: Vec<u8> = vec![0; 68];
     buf[0] = 19;
     buf[1..20].copy_from_slice(b"BitTorrent protocol");
     buf[28..48].copy_from_slice(&torrent::get_info_hash());
-    // TODO get peer id from somewhere
-    // buf[48..68].copy_from_slice(&tracker::get_peer_id());
-    sock.write_all(&buf)
+    buf[48..68].copy_from_slice(my_id);
+    sock.write_all(&buf)?;
+    Ok(())
+}
+
+/// called when we recieve a handshake (the first message ever sent from a user)
+/// TODO make sure alex knows to clal this separately
+/// TODO make this handle partial recieves but its annoying and insanely unlikely for a handshake
+/// returns the peer id of the peer that sent the handshake
+pub fn recv_handshake(peer:&mut Peer) -> Result<Vec<u8>> {
+    let sock = peer.get_mut_socket();
+    
+    let mut buf: Vec<u8> = vec![0; 68];
+    sock.read_exact(&mut buf)?;
+
+    if buf[0] != 19 {
+        println!("broken handshake");
+        return Err(Error::msg("handshake invalid length"));
+    }
+    if &buf[1..20] != b"BitTorrent protocol" {
+        println!("broken handshake");
+        return Err(Error::msg("handshake invalid protocol"));
+    }
+    if &buf[28..48] != torrent::get_info_hash().as_slice() {
+        println!("broken handshake");
+        return Err(Error::msg("handshake invalid info hash"));
+    }
+    return Ok(buf[48..68].to_vec());
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use mio::net::{TcpListener, TcpStream};
+    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+    fn networking_setup(port: u16) -> (TcpStream, TcpStream) {
+        let serv_sock = TcpListener::bind(SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::UNSPECIFIED,
+            port,
+        )))
+        .unwrap();
+        let self_sock = TcpStream::connect(SocketAddr::V4(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            port,
+        )))
+        .unwrap();
+        let (other_sock, _) = serv_sock.accept().unwrap();
+        (self_sock, other_sock)
+    }
+
+    #[test]
+    fn test_p2p_handshakes()->Result<()> {
+        // Set up networking.
+        let (self_sock, mut other_sock) = networking_setup(8001);
+
+        // Create a peer, give it the TcpStream, and then see if the stream
+        // can be written to and read from.
+        let mut peer = Peer::new(&[b'a'; 20], self_sock);
+        let get_sock = peer.get_mut_socket();
+
+        //send handshake
+        send_handshake(&mut other_sock, &[b'a'; 20])?;
+        //recv handshake
+        dbg!(recv_handshake(&mut peer).unwrap());
+
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_p2p_send_msgs()->Result<()> {
+        // Set up networking.
+        let (self_sock, mut other_sock) = networking_setup(8002);
+
+        // Create a peer, give it the TcpStream, and then see if the stream
+        // can be written to and read from.
+        let mut peer = Peer::new(&[b'a'; 20], self_sock);
+        let get_sock = peer.get_mut_socket();
+
+        //send handshake
+        send_handshake(&mut other_sock, &[b'a'; 20])?;
+        //recv handshake
+        dbg!(recv_handshake(&mut peer).unwrap());
+
+        // // Write
+        // let string = b"test";
+        // dbg!(get_sock.write(string).unwrap());
+        // let mut buf: [u8; 4] = [0; 4];
+        // dbg!(other_sock.read(&mut buf).unwrap());
+        // dbg!(std::str::from_utf8(&buf).unwrap());
+        // assert_eq!(string, &buf);
+
+        // // Read
+        // let string = b"helo";
+        // dbg!(other_sock.write(string).unwrap());
+        // dbg!(get_sock.read(&mut buf).unwrap());
+        // dbg!(std::str::from_utf8(&buf).unwrap());
+        // assert_eq!(string, &buf);
+
+        Ok(())
+    }
 }

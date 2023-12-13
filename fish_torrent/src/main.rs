@@ -45,13 +45,13 @@ struct Args {
 }
 
 struct SelfInfo {
-    tracker_id:[u8; 20],
+    tracker_id: [u8; 20],
     peer_id: [u8; 20],
     port: u16,
     uploaded: usize,
     downloaded: usize,
     left: usize,
-    tracker_event: Event
+    tracker_event: Event,
 }
 
 /// main handles the initialization of stuff and keeping the event loop logic going
@@ -62,7 +62,7 @@ fn main() {
     // things i own :)
     let mut self_info = SelfInfo {
         tracker_id: [0; 20],
-        peer_id: [0; 20],
+        peer_id: [0; 20], // TODO make peerid not zero :D
         port: args.port,
         uploaded: 0,
         downloaded: 0,
@@ -223,8 +223,8 @@ fn main() {
                                 // yay we got a full response, time to do things :)
                                 tracker_timeout =
                                     Duration::new(tracker_response.interval.try_into().unwrap(), 0);
-                                    // Duration::new(10, 0);
-                                
+                                // Duration::new(10, 0);
+
                                 // if let Some(tracker_id) = tracker_response.tracker_id {
                                 //     self_info.tracker_id = tracker_response.tracker_id;
                                 // }
@@ -236,11 +236,10 @@ fn main() {
                                     tracker_response,
                                 );
 
-
                                 poll.registry()
                                     .deregister(&mut tracker_sock)
                                     .expect("tracker deregister fail");
-                                
+
                                 // tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was shutdown :D");
                             }
                             None => {
@@ -262,7 +261,7 @@ fn main() {
                             self_info.tracker_event,
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
-                        
+
                         if self_info.tracker_event == Event::STARTED {
                             self_info.tracker_event = Event::PERIODIC;
                         }
@@ -280,7 +279,7 @@ fn main() {
                         let peer = peer_list.remove_peer(peer_addr).unwrap();
                         // you cant shutdown a non connected socket (as we have figured out very quickly)
                         if !event.is_error() {
-                            peer.disconnect(); 
+                            peer.disconnect();
                         }
                         continue;
                     }
@@ -314,7 +313,10 @@ fn add_all_peers(
                     .register(socket, token, Interest::READABLE)
                     .expect(&format!("failed to register peer {:?}", peer_addr));
                 sockets.insert(token, peer_addr);
-                dbg!(format!("syn'd and added peer {:?} with token {:?}", peer_addr, token));
+                dbg!(format!(
+                    "syn'd and added peer {:?} with token {:?}",
+                    peer_addr, token
+                ));
             } else {
                 println!("already connected to peer {:?}", peer_addr);
             }
