@@ -143,15 +143,15 @@ fn main() {
 
     loop {
         // timer for blasting send
-        if strategy_timer.elapsed() >= STRATEGY_TIMEOUT {
-            dbg!("strategy timeout occurred !!");
+        if strategy_timer.elapsed() > STRATEGY_TIMEOUT {
+            // dbg!("strategy timeout occurred !!");
             // strategy::what_do(&mut peer_list);
             // p2p::send_all(&mut peer_list);
             strategy_timer = Instant::now();
         }
 
         // timer for blasting tracker
-        if tracker_timer.elapsed() >= tracker_timeout {
+        if tracker_timer.elapsed() > tracker_timeout {
             dbg!("tracker timeout occurred !!");
 
             // we simply reconnect to the tracker
@@ -210,7 +210,6 @@ fn main() {
                             partial_tracker_data,
                             &mut tracker_sock,
                         );
-                        println!("bald");
                         dbg!(&data);
                         dbg!(&response);
                         partial_tracker_data = data;
@@ -255,10 +254,20 @@ fn main() {
                     }
                 }
                 token => {
-                    if let Some(socket) = sockets.get(&token) {
-                        handle_peer(sockets.get(&token).unwrap());
+                    dbg!("peer socket activity with token {:?}", token);
+                    // something went wrong so uh idc about you anymore
+                    if event.is_error() || event.is_read_closed() {
+                        let peer_addr = sockets.remove(&token).unwrap();
+                        let peer = peer_list.remove_peer(peer_addr).unwrap();
+                        peer.disconnect(); 
+                        continue;
+                    }
+
+                    // lets see what the said to us
+                    if let Some(peer_addr) = sockets.get(&token) {
+                        handle_peer(peer_addr);
                     } else {
-                        println!("there is no socket associated with token {:#?}", token);
+                        println!("there is no socket associated with token {:?}", token);
                     }
                 }
             }
@@ -275,7 +284,7 @@ fn add_all_peers(
 ) {
     // each peer is a SockAddr initially
     for peer_addr in tracker_response.socket_addr_list {
-        if let Ok(mut socket) = TcpStream::connect(peer_addr) {
+        if let Ok(socket) = TcpStream::connect(peer_addr) {
             // add peer ?? ?? ?? (is it there already !! ??)
             if let Ok(socket) = peer_list.add_incomplete_peer(peer_addr, socket) {
                 let token = get_new_token();
@@ -283,6 +292,7 @@ fn add_all_peers(
                     .register(socket, token, Interest::READABLE)
                     .expect(&format!("failed to register peer {:?}", peer_addr));
                 sockets.insert(token, peer_addr);
+                dbg!(format!("connected and added peer {:?} with token {:?}", peer_addr, token));
             } else {
                 println!("already connected to peer {:?}", peer_addr);
             }
