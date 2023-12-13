@@ -114,6 +114,11 @@ pub fn parse_torrent_file(filename: &str) {
     // println!("infohash: {:?}\n", TORRENT.get().unwrap().info_hash);
 }
 
+
+pub fn get_file_name() -> &'static str {
+    &TORRENT.get().unwrap().info.name
+}
+
 /// 20 byte SHA1 hashvalue of the swarm
 pub fn get_info_hash() -> &'static Vec<u8> {
     &TORRENT.get().unwrap().info_hash
