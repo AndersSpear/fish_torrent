@@ -84,11 +84,11 @@ impl OutputFile {
                 self.pieces[index].set(i, true);
             }
 
-            let finished = self.is_piece_finished(index);
+            let finished = self.is_piece_finished(index)?;
             if finished == true {
                 file_bitfield.set(i, true);
             }
-            finished
+            Ok(finished)
         }
     }
 
