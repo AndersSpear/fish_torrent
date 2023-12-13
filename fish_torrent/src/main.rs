@@ -301,11 +301,12 @@ fn main() {
                         if peer.is_complete() {
                             handle_peer(peer, &mut output_file);
                         } 
+                        // no we havent
                         else {
                             if event.is_readable() {
                                 dbg!("Got a handshake from peer");
                                 let peer_id = p2p::recv_handshake(peer.get_mut_socket()).unwrap();
-                                // peer_list.complete_peer(peer_addr, peer_id[..20]);
+                                peer_list.complete_peer(peer_addr, &peer_id.try_into().unwrap()).unwrap();
                             }
                             else if event.is_writable() {
                                 dbg!("Sent a handshake to peer");
