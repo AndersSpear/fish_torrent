@@ -15,7 +15,6 @@ mod torrent;
 mod tracker;
 
 use clap::Parser;
-use mio::event::Source;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use peers::Peer;
@@ -124,6 +123,7 @@ fn main() {
     )
     .expect("connect failed");
     const TRACKER: Token = Token(1);
+    dbg!(&tracker_sock);
 
     // let mut tracker_sock2 = TcpStream::from_std(
     //     std::net::TcpStream::connect("128.8.126.63:6969").expect("connect failed"),
@@ -174,6 +174,7 @@ fn main() {
                     .unwrap(),
             )
             .expect("connect failed");
+            dbg!(&tracker_sock);
 
             // registers our tracker socket in the epoll
             poll.registry()
@@ -198,10 +199,10 @@ fn main() {
                         println!("new client: {peer_addr:?}");
 
                         // add peer !!! !!
-                        if let Ok(socket) = peer_list.add_incomplete_peer(peer_addr, socket) {
+                        if let Ok(peer) = peer_list.add_peer(peer_addr, socket, None) {
                             let token = get_new_token();
                             poll.registry()
-                                .register(socket, token, Interest::READABLE)
+                                .register(peer.get_mut_socket(), token, Interest::WRITABLE | Interest::READABLE)
                                 .expect(&format!("failed to register peer {:?}", peer_addr));
                             sockets.insert(token, peer_addr);
                         } else {
@@ -214,8 +215,9 @@ fn main() {
                 TRACKER => {
                     dbg!("tracker socket activity");
                     // is it a readable ?? (receive blasted message)
+
                     if event.is_readable() {
-                        dbg!("readable");
+                        dbg!("tracker readable");
                         let (data, response) = tracker::handle_tracker_response(
                             partial_tracker_data,
                             &mut tracker_sock,
@@ -246,7 +248,8 @@ fn main() {
                                     .deregister(&mut tracker_sock)
                                     .expect("tracker deregister fail");
 
-                                // tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was not shutdown :(");
+                                tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was not shutdown :(");
+                                dbg!("tracker shutdown!!");
                             }
                             None => {
                                 // cringe !!! 727 WYSI !!! (it was 7:27 at the time of writing this code)
@@ -255,6 +258,7 @@ fn main() {
                     }
                     // is it a writable ?? (blast message out)
                     else if event.is_writable() {
+                        dbg!("tracker writable");
                         dbg!(get_info_hash());
                         dbg!(tracker::bytes_to_urlencoding(&get_info_hash()));
                         let tracker_request = TrackerRequest::new(
@@ -285,14 +289,33 @@ fn main() {
                         let peer = peer_list.remove_peer(peer_addr).unwrap();
                         // you cant shutdown a non connected socket (as we have figured out very quickly)
                         if !event.is_error() {
-                            peer.disconnect();
+                            peer.disconnect().expect("failed to disconnect peer");
                         }
                         continue;
                     }
 
                     // lets see what they said to us
                     if let Some(&peer_addr) = sockets.get(&token) {
-                        handle_peer(peer_list.find_peer(peer_addr).unwrap(), &mut output_file);
+                        // have we completed the peer yet?
+                        let peer = peer_list.find_peer(peer_addr).unwrap();
+                        if peer.is_complete() {
+                            handle_peer(peer, &mut output_file);
+                        } 
+                        else {
+                            if event.is_readable() {
+                                dbg!("Got a handshake from peer");
+                                let peer_id = p2p::recv_handshake(peer.get_mut_socket()).unwrap();
+                                // peer_list.complete_peer(peer_addr, peer_id[..20]);
+                            }
+                            else if event.is_writable() {
+                                dbg!("Sent a handshake to peer");
+                                p2p::send_handshake(peer, &self_info.peer_id, &output_file).expect("failed to send handshake");
+                                // only care about readable events from now on
+                                poll.registry()
+                                    .reregister(peer.get_mut_socket(), token, Interest::READABLE)
+                                    .expect("peer rereg fail");
+                            }
+                        }
                     } else {
                         println!("there is no socket associated with token {:?}", token);
                     }
@@ -313,10 +336,10 @@ fn add_all_peers(
     for peer_addr in tracker_response.socket_addr_list {
         if let Ok(socket) = TcpStream::connect(peer_addr) {
             // add peer ?? ?? ?? (is it there already !! ??)
-            if let Ok(socket) = peer_list.add_incomplete_peer(peer_addr, socket) {
+            if let Ok(peer) = peer_list.add_peer(peer_addr, socket, None) {
                 let token = get_new_token();
                 poll.registry()
-                    .register(socket, token, Interest::READABLE)
+                    .register(peer.get_mut_socket(), token, Interest::WRITABLE | Interest::READABLE)
                     .expect(&format!("failed to register peer {:?}", peer_addr));
                 sockets.insert(token, peer_addr);
                 dbg!(format!(
@@ -342,8 +365,9 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
     dbg!(format!("handling peer {:?}", peer));
     p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
                                                                  // TODO: should remove peer if error reading? (question mark?)
-    for msg in peer.get_mut_messages().messages {
-        // implement iterator madge ! (or give me access or something)
+    let messages = peer.messages.messages.clone();
+
+    for msg in messages {
         dbg!(format!("message is {:?}", msg));
         match msg {
             MessageType::Choke => {
@@ -359,29 +383,32 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
                 peer.peer_interested = false;
             }
             MessageType::Have{index} => {
-                peer.set_piece_bit(index.try_into().unwrap());
+                peer.set_piece_bit(index.try_into().unwrap(), true);
             }
             MessageType::Bitfield{field} => {
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request{index, begin, length} => {
                 // check if we are choking them? or do we just send?
+                peer.push_request(index.try_into().unwrap(), begin.try_into().unwrap(), length.try_into().unwrap());
             }
             MessageType::Piece{index, begin, block} => {
-                output_file.write_block(index.try_into().unwrap(), begin.try_into().unwrap(), block);
+                output_file.write_block(index.try_into().unwrap(), begin.try_into().unwrap(), block).expect("failed to write block");
             }
             MessageType::Cancel{index, begin, length} => {
                 // remove them as being interested ??
+                // peer.remove_request(index, begin, length);
             }
             MessageType::KeepAlive => {
-                // uh i dont htink we do anything hrere
+                // uh i dont htink we do anything hrere yet
+                // reset a peer timeout if we ever implement that
             }
-            Undefined => {
-                // does this still exist questio mark
-            }
-            MessageType::HandshakeResponse => {
-                // do i care?
-            }
+            // MessageType::Undefined => {
+            //     // does this still exist questio mark
+            // }
+            // MessageType::HandshakeResponse => {
+            //     // do i care?
+            // }
         }
     }
 }

@@ -159,6 +159,7 @@ pub fn get_tracker_response_from_vec_u8(buf: &Vec<u8>) -> TrackerResponse {
 
     // Find the position of the double CRLF separator
     //iterates through byte vector
+    dbg!(buf);
     let body = parse_body_from_response(buf)
         .expect("parse_body_from_response in get_tracker_from_response fail");
 
