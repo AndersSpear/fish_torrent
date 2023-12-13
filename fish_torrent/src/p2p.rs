@@ -108,7 +108,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
     };
     println!("read {} bytes from socket", local_buf.len());
 
-    let mut buf = peer.get_mut_recv_buffer();
+    let mut buf = &mut peer.recv_buffer;
     buf.append(&mut local_buf);
 
     loop {
@@ -122,7 +122,8 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
         }
     }
 
-    peer.set_messages(return_msgs);
+    //peer.set_messages(return_msgs);
+    peer.messages = return_msgs;
     Ok(())
 }
 

@@ -17,6 +17,7 @@ pub struct OutputFile {
     num_pieces: usize,
     piece_size: usize,
     pieces: Vec<BitVec<u8, Msb0>>,
+    file_bitfield: BitVec<u8, Msb0>,
 }
 
 impl OutputFile {
@@ -50,10 +51,15 @@ impl OutputFile {
                 num_pieces,
                 piece_size,
                 pieces: vec![bitvec![u8, Msb0; 0; piece_size]; num_pieces],
+                file_bitfield: bitvec![u8, Msb0; 0; num_pieces],
             })
         } else {
             None
         }
+    }
+
+    pub fn get_file_bitfield(&self) -> BitVec<u8, Msb0> {
+        self.file_bitfield.clone()
     }
 
     /// Writes a block (Vector) of bytes to the specified piece index and
@@ -78,7 +84,11 @@ impl OutputFile {
                 self.pieces[index].set(i, true);
             }
 
-            self.is_piece_finished(index)
+            let finished = self.is_piece_finished(index);
+            if finished == true {
+                file_bitfield.set(i, true);
+            }
+            finished
         }
     }
 
