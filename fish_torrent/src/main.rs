@@ -92,7 +92,8 @@ fn main() {
     // read in torrent file:W
     parse_torrent_file(&args.file);
 
-    // let mut output_file = OutputFile::new(get_file_name(), get_number_of_pieces(), get_piece_length());
+    // TODO bug anders
+    let mut output_file = OutputFile::new(get_file_name(), get_number_of_pieces(), get_piece_length());
 
     // parse that url and open the initial socket
     // this blocks because wth are you gonna do while you wait for a response
@@ -239,8 +240,8 @@ fn main() {
                                 poll.registry()
                                     .deregister(&mut tracker_sock)
                                     .expect("tracker deregister fail");
-
-                                // tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was shutdown :D");
+                                
+                                // tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was not shutdown :(");
                             }
                             None => {
                                 // cringe !!! 727 WYSI !!! (it was 7:27 at the time of writing this code)
@@ -284,9 +285,9 @@ fn main() {
                         continue;
                     }
 
-                    // lets see what the said to us
-                    if let Some(peer_addr) = sockets.get(&token) {
-                        handle_peer(peer_addr);
+                    // lets see what they said to us
+                    if let Some(&peer_addr) = sockets.get(&token) {
+                        handle_peer(peer_list.find_peer(peer_addr).unwrap(), output_file);
                     } else {
                         println!("there is no socket associated with token {:?}", token);
                     }
@@ -332,39 +333,49 @@ fn get_new_token() -> Token {
 }
 
 /// handles the message it got from a peer
-fn handle_peer(peer_addr: &SocketAddr) {
-    // handle_message(socket);
-    // match () {
-    //     Choke => {
-
-    //     }
-    //     Unchoke => {
-
-    //     }
-    //     Interested => {
-
-    //     }
-    //     NotInterested => {
-
-    //     }
-    //     Have(index) => {
-    //     }
-    //     Bitfield(field) => {
-    //     }
-    //     Request(index, begin, length) => {
-    //     }
-    //     Piece(index, begin, block) => {
-    //     }
-    //     Cancel(index, begin, length) => {
-    //     }
-    //     KeepAlive => {
-
-    //     }
-    //     Undefined => {
-
-    //     }
-    //     HandshakeResponse => {
-
-    //     }
-    // }
+fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
+    dbg!(format!("handling peer {:?}", peer));
+    p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
+    // TODO: should remove peer if error reading? (question mark?)
+    for msg in peer.get_mut_messages() { // implement iterator madge ! (or give me access or something)
+        dbg!(format!("message is {}", msg));
+        match (msg) {
+            Choke => {
+                peer.set_peer_choking(true);
+            }
+            Unchoke => {
+                peer.set_peer_choking(false);
+            }
+            Interested => {
+                peer.set_peer_interested(true);
+            }
+            NotInterested => {
+                peer.set_peer_interested(false);
+            }
+            Have(index) => {
+                peer.set_piece_bit(index);
+            }
+            Bitfield(field) => {
+                peer.init_piece_bitfield(field);
+            }
+            Request(index, begin, length) => {
+                // check if we are choking them? or do we just send?
+            }
+            Piece(index, begin, block) => {
+                output_file.write_block(index, begin, block);
+            }
+            Cancel(index, begin, length) => {
+                // remove them as being interested ??
+            }
+            KeepAlive => {
+                // uh i dont htink we do anything hrere
+            }
+            Undefined => {
+                // does this still exist questio mark
+            }
+            HandshakeResponse => {
+                // do i care?
+            }
+        }
+    }
 }
