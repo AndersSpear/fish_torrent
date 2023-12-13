@@ -56,7 +56,7 @@ impl Peer {
         }
     }
 
-    pub fn is_complete(&self, addr: SocketAddr) -> bool {
+    pub fn is_complete(&self) -> bool {
         self.peer_id.is_some()
     }
 
