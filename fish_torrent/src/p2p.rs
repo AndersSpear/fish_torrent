@@ -379,9 +379,7 @@ pub fn send_handshake(peer: &mut Peer, my_id: &[u8; 20], file: &OutputFile) -> R
 /// TODO make sure alex knows to clal this separately
 /// TODO make this handle partial recieves but its annoying and insanely unlikely for a handshake
 /// returns the peer id of the peer that sent the handshake
-pub fn recv_handshake(peer: &mut Peer) -> Result<Vec<u8>> {
-    let sock = peer.get_mut_socket();
-
+pub fn recv_handshake(sock: &mut TcpStream) -> Result<Vec<u8>> {
     let mut buf: Vec<u8> = vec![0; 68];
     sock.read_exact(&mut buf)?;
 
@@ -432,15 +430,17 @@ mod test {
             // Create a peer, give it the TcpStream, and then see if the stream
             // can be written to and read from.
             let mut peer = Peer::new(self_sock);
+            let mut other_peer = Peer::new(other_sock);
             let get_sock = peer.get_mut_socket();
 
             //init torrent struct with infohash
             torrent::parse_torrent_file("../artofwar.torrent");
 
+            let file = File::new("p2p.rs.test", 5, 5);
             //send handshake
-            send_handshake(&mut other_sock, &[b'a'; 20]).unwrap();
+            send_handshake(&mut other_peer, &[b'a'; 20], &file).unwrap();
             //recv handshake
-            recv_handshake(&mut peer).unwrap();
+            recv_handshake(&mut self_sock).unwrap();
         }
     }
 
@@ -487,19 +487,19 @@ mod test {
            let keep_alive = MessageType::KeepAlive;
 
 
-           sender.get_mut_messages().messages.push(choke);
-           sender.get_mut_messages().messages.push(unchoke);
-           sender.get_mut_messages().messages.push(interested);
-           sender.get_mut_messages().messages.push(not_interested);
-           sender.get_mut_messages().messages.push(have);
-           sender.get_mut_messages().messages.push(bitfield);
-           sender.get_mut_messages().messages.push(request);
-           sender.get_mut_messages().messages.push(piece);
-           sender.get_mut_messages().messages.push(cancel);
-           sender.get_mut_messages().messages.push(keep_alive);
+           sender.messages.messages.push(choke);
+           sender.messages.messages.push(unchoke);
+           sender.messages.messages.push(interested);
+           sender.messages.messages.push(not_interested);
+           sender.messages.messages.push(have);
+           sender.messages.messages.push(bitfield);
+           sender.messages.messages.push(request);
+           sender.messages.messages.push(piece);
+           sender.messages.messages.push(cancel);
+           sender.messages.messages.push(keep_alive);
 
 
-           let messages = sender.get_messages_clone();
+           let messages = sender.messages.clone();
            sender.reset_messages();
 
            let get_sock = sender.get_mut_socket();
