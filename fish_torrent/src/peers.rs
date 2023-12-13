@@ -149,7 +149,11 @@ impl Peers {
     /// Removes a Peer from the Peers struct.
     /// Returns the Peer that was removed for disconnecting.
     pub fn remove_peer(&mut self, addr: SocketAddr) -> Option<Peer> {
-        self.list.remove(&addr)
+        if self.list.contains_key(&addr) == true {
+            self.list.remove(&addr)
+        else {
+            self.incomplete.remove(&addr)
+        }
     }
 
     pub fn add_incomplete_peer(
