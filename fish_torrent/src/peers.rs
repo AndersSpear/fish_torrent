@@ -28,7 +28,7 @@ pub struct Request {
 
 #[derive(Debug)]
 pub struct Peer {
-    peer_id: [u8; 20],
+    peer_id: Option<[u8; 20]>,
     socket: TcpStream,
     pub am_choking: bool,
     pub am_interested: bool,
@@ -41,9 +41,9 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub fn new(peer_id: Option<&[u8; 20]>, socket: TcpStream) -> Self {
+    pub fn new(socket: TcpStream) -> Self {
         Self {
-            peer_id: if let Some(id) = peer_id { *id } else { [0; 20] },
+            peer_id: None,
             socket,
             am_choking: true,
             am_interested: false,
@@ -54,6 +54,10 @@ impl Peer {
             recv_buffer: Vec::new(),
             messages: Messages::new(),
         }
+    }
+
+    pub fn is_complete(&self, addr: SocketAddr) -> bool {
+        self.peer_id.is_some()
     }
 
     //fn new_incomplete(socket: TcpStream) -> Self {
@@ -91,26 +95,6 @@ impl Peer {
     
     pub fn remove_request(&mut self) -> Option<Request> {
         unimplemented!();
-    }
-
-    pub fn get_mut_recv_buffer(&mut self) -> &mut Vec<u8> {
-        &mut self.recv_buffer
-    }
-
-    pub fn get_mut_messages(&mut self) -> &mut Messages {
-        &mut self.messages
-    }
-
-    pub fn get_messages_clone(&self) -> Messages {
-        self.messages.clone()
-    }
-
-    pub fn reset_messages(&mut self) {
-        self.messages = Messages::new();
-    }
-
-    pub fn set_messages(&mut self, messages: Messages) {
-        self.messages = messages;
     }
 }
 
@@ -166,7 +150,7 @@ impl Peers {
         peer_id: Option<&[u8; 20]>,
     ) -> Result<&mut Peer> {
         if self.list.contains_key(&addr) == false && self.incomplete.contains_key(&addr) == false {
-            let new_peer = Peer::new(peer_id, sock);
+            let new_peer = Peer::new(sock);
             if peer_id == None {
                 self.incomplete.insert(addr, new_peer);
                 Ok(self
@@ -235,11 +219,11 @@ impl Peers {
     pub fn complete_peer(&mut self, addr: SocketAddr, peer_id: &[u8; 20]) -> Result<()> {
         if self.incomplete.contains_key(&addr) == true && self.list.contains_key(&addr) == false {
             let peer = self.incomplete.remove(&addr).unwrap();
-            peer.peer_id = *peer_id;
+            peer.peer_id = Some(*peer_id);
             self.list.insert(addr, peer);
             Ok(())
         } else {
-            Err(Error::msg("I don't even know how you got to this state."))
+            Err(Error::msg("Either you tried to re-complete a peer or complete a peer that was never added. And I don't know what's worse."))
         }
     }
 
