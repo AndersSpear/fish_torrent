@@ -6,8 +6,8 @@ use mio::net::TcpStream;
 use serde::{Deserialize, Serialize};
 use std::ascii::escape_default;
 use std::io::prelude::*;
-use urlencoding::encode;
 use url::Url;
+use urlencoding::encode;
 // enum Peers {
 //     Compact(Vec<u8>),
 //     NonCompact(Vec<Peer>),
@@ -92,7 +92,6 @@ impl TrackerRequest {
         )
     }
 }
-
 
 pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> {
     let separator_pos = response
@@ -231,7 +230,7 @@ mod tests {
             0,
             0,
             0,
-            Event::STARTED
+            Event::STARTED,
         );
         let request = TrackerRequest::construct_tracker_request(&tr);
 
@@ -248,7 +247,7 @@ mod tests {
             0,
             0,
             0,
-            Event::STARTED
+            Event::STARTED,
         );
 
         // this should only fail if the UMD server is down.
@@ -273,9 +272,8 @@ mod tests {
             0,
             0,
             0,
-            Event::STARTED
+            Event::STARTED,
         );
-
 
         let mut tracker_sock = TcpStream::from_std(
             std::net::TcpStream::connect(
@@ -288,6 +286,7 @@ mod tests {
             )
             .expect("connect failed"),
         );
+
         send_tracker_request(&tracker_request, &mut tracker_sock).expect("could not send_tracker_request");
         let tr = handle_tracker_response(vec![],&mut tracker_sock);
         match tr {
@@ -299,7 +298,6 @@ mod tests {
                 // ignore
             }
         }
-        
 
         // this should only fail if the UMD server is down.
         //let response = send_tracker_request(&tracker_request, "poole.cs.umd.edu:6969").unwrap();
