@@ -81,6 +81,14 @@ impl Peer {
         &mut self.messages
     }
 
+    pub fn get_messages_clone(&self) -> Messages {
+        self.messages.clone()
+    }
+
+    pub fn reset_messages(&mut self) {
+        self.messages = Messages::new();
+    }
+
     pub fn set_messages(&mut self, messages: Messages) {
         self.messages = messages;
     }

@@ -62,6 +62,9 @@ struct File {
 /// Parses the .torrent file
 /// unsafe because it modifies a static variable
 pub fn parse_torrent_file(filename: &str) {
+    if let Some(_) = TORRENT.get() {
+        return;
+    }
     let contents = read(filename).expect("invalid .torrent filename");
     let torrent =
         from_bytes::<Torrent>(contents.as_slice()).expect("bruv debnencoding the .torrent failed");
@@ -102,12 +105,13 @@ pub fn parse_torrent_file(filename: &str) {
 
     TORRENT.set(torrent).expect("Failed to set torrent");
 
-    println!("announce: {}", TORRENT.get().unwrap().announce);
-    println!("length: {}", TORRENT.get().unwrap().info.length);
-    println!("name: {}", TORRENT.get().unwrap().info.name);
-    println!("piece length: {}", TORRENT.get().unwrap().info.piece_length);
-    println!("pieces vec: {:?}", TORRENT.get().unwrap().info.pieces);
-    println!("infohash: {:?}", TORRENT.get().unwrap().info_hash);
+    // println!("::: torrent info :::");
+    // println!("announce: {}", TORRENT.get().unwrap().announce);
+    // println!("length: {}", TORRENT.get().unwrap().info.length);
+    // println!("name: {}", TORRENT.get().unwrap().info.name);
+    // println!("piece length: {}", TORRENT.get().unwrap().info.piece_length);
+    // println!("pieces vec: {:?}", TORRENT.get().unwrap().info.pieces);
+    // println!("infohash: {:?}\n", TORRENT.get().unwrap().info_hash);
 }
 
 /// 20 byte SHA1 hashvalue of the swarm

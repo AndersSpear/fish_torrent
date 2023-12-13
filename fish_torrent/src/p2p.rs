@@ -5,11 +5,10 @@
 //! call send_all(peers) for sending to all peers
 //! call handle_messages(peer) for recieving from one peer
 //! call send_handshake(sock, my_id) to send a handshake to a peer
-//! call 
-use crate::peers::Peers;
+//! call
+use crate::peers::{Peer, Peers};
 
-use super::peers::Peer;
-use super::torrent;
+use crate::torrent;
 use bitvec::prelude::*;
 
 use byteorder::ByteOrder;
@@ -19,45 +18,45 @@ use std::io::Write;
 
 use byteorder::BigEndian;
 
-use anyhow::{Result, Error};
+use anyhow::{Error, Result};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Messages {
     messages: Vec<MessageType>,
 }
 
 /// A little added enum with associated data structs from Tien :)
 /// length is ususlaly 16Kib, 2^14
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MessageType {
     Choke,
     Unchoke,
     Interested,
     NotInterested,
     Have {
-        index: usize,
+        index: u32,
     },
     Bitfield {
-        field: BitVec<u8>,
+        field: BitVec<u8, Msb0>,
     }, // BitVec is a bitvector from the bitvec crate
     Request {
-        index: usize,
-        begin: usize,
-        length: usize,
+        index: u32,
+        begin: u32,
+        length: u32,
     },
     Piece {
-        index: usize,
-        begin: usize,
+        index: u32,
+        begin: u32,
         block: Vec<u8>,
     },
     Cancel {
-        index: usize,
-        begin: usize,
-        length: usize,
+        index: u32,
+        begin: u32,
+        length: u32,
     },
     KeepAlive, // KeepAlive is last because it does not have an associated
-    // id in the protocol. This way choke starts at id 0.
-    //Port // DHT Tracker is not supported, so this msg is not handled.
+               // id in the protocol. This way choke starts at id 0.
+               //Port // DHT Tracker is not supported, so this msg is not handled.
 }
 
 /// sends all messages in the peers struct
@@ -106,7 +105,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
             0
         }
     };
-    println!("read {} bytes from socket", readcount);
+    println!("read {} bytes from socket", local_buf.len());
 
     let mut buf = peer.get_mut_recv_buffer();
     buf.append(&mut local_buf);
@@ -129,13 +128,17 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
 // TODO make sure this handles handshakes smile
 /// tries to parse one message from the buffer
 fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
+    dbg!(buf.len());
+    
     if buf.len() < 4 {
+        dbg!("less than 4 bytes in buffer");
         return None;
     }
     let len = BigEndian::read_u32(&buf[0..4]);
-
+    dbg!(len);
     //this could break if buf[0..4] gets corrupted and is big
     if buf.len() < len as usize + 4 {
+        dbg!("not enough bytes in buffer");
         return None;
     }
 
@@ -172,13 +175,12 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
             }
         },
         n => {
+            dbg!(buf[4]);
             // length 5 and messageID 4, must be a Have message
             if buf[4] == 4 && n == 5 {
                 let index = BigEndian::read_u32(&buf[5..9]);
                 buf.drain(0..9);
-                MessageType::Have {
-                    index: index as usize,
-                }
+                MessageType::Have { index }
             } else if (buf[4] == 8 || buf[4] == 6) && n == 13 {
                 // length 13 and messageID 6 or 8, must be a Request or Cancel message
                 let index = BigEndian::read_u32(&buf[5..9]);
@@ -188,14 +190,14 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
 
                 match buf[4] {
                     6 => MessageType::Request {
-                        index: index as usize,
-                        begin: begin as usize,
-                        length: length as usize,
+                        index,
+                        begin,
+                        length,
                     },
                     8 => MessageType::Cancel {
-                        index: index as usize,
-                        begin: begin as usize,
-                        length: length as usize,
+                        index,
+                        begin,
+                        length,
                     },
                     _ => {
                         println!("malformed message, clearing buffer");
@@ -211,8 +213,8 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                 buf.drain(0..13);
                 buf.drain(0..block.len());
                 MessageType::Piece {
-                    index: index as usize,
-                    begin: begin as usize,
+                    index,
+                    begin,
                     block,
                 }
             } else if (buf[4] == 5) && n > 5 {
@@ -248,7 +250,7 @@ impl MessageType {
             MessageType::Have { index } => {
                 send_have(sock, index)?;
             }
-            MessageType::Bitfield { field } => {
+            MessageType::Bitfield { mut field } => {
                 send_bitfield(sock, field)?;
             }
             MessageType::Request {
@@ -287,27 +289,36 @@ fn send_len_id(sock: &mut TcpStream, len: u32, id: u8) -> Result<(), Error> {
     Ok(())
 }
 
-fn send_have(sock: &mut TcpStream, index: usize) -> Result<(), Error> {
+fn send_have(sock: &mut TcpStream, index: u32) -> Result<(), Error> {
     let mut buf = vec![0; 9];
-    buf[0..4].copy_from_slice(&9_u32.to_be_bytes());
+    buf[0..4].copy_from_slice(&5_u32.to_be_bytes());
     buf[4] = 4; // message id 4 is have
     buf[5..9].copy_from_slice(&index.to_be_bytes());
     sock.write_all(&buf)?;
     Ok(())
 }
 
-fn send_bitfield(sock: &mut TcpStream, field: BitVec<u8>) -> Result<(), Error> {
+fn send_bitfield(sock: &mut TcpStream, mut field: BitVec<u8, Msb0>) -> Result<(), Error> {
+
+        //bitvec manipulation
+        field.force_align();
+        field.set_uninitialized(false);
+    
+        //dbg!(&field);
+        let vecfield = field.into_vec();
+
     // TODO make sure length is in bytes not bits
-    let length = field.len() as usize;
+    let length = vecfield.len() as u32;
 
-    // TODO make sure the into_vec is byte aligned and end is padded with 0s
-    //field.force_align();
-
+    
     let mut buf = vec![0; 5];
     buf[0..4].copy_from_slice(&(length + 1).to_be_bytes());
     buf[4] = 5; // message id 5 is bitfield
-    buf.extend(field.into_vec());
+
+
+    buf.extend(vecfield);
     sock.write_all(&buf)?;
+    assert_eq!(buf.len(), length as usize + 5);
     Ok(())
 }
 
@@ -315,11 +326,11 @@ fn send_bitfield(sock: &mut TcpStream, field: BitVec<u8>) -> Result<(), Error> {
 fn send_request_or_cancel(
     sock: &mut TcpStream,
     is_request_message: bool,
-    index: usize,
-    begin: usize,
-    length: usize,
+    index: u32,
+    begin: u32,
+    length: u32,
 ) -> Result<(), Error> {
-    let mut buf = vec![0; 17];
+    let mut buf = vec![0; 18];
     buf[0..4].copy_from_slice(&13_u32.to_be_bytes());
     buf[4] = if is_request_message { 6 } else { 8 }; // message id 6 is request, 8 is cancel
     buf[5..9].copy_from_slice(&index.to_be_bytes());
@@ -329,13 +340,8 @@ fn send_request_or_cancel(
     Ok(())
 }
 
-fn send_piece(
-    sock: &mut TcpStream,
-    index: usize,
-    begin: usize,
-    block: Vec<u8>,
-) -> Result<(), Error> {
-    let length = block.len() as usize;
+fn send_piece(sock: &mut TcpStream, index: u32, begin: u32, block: Vec<u8>) -> Result<(), Error> {
+    let length = block.len() as u32;
 
     let mut buf = vec![0; 13];
     buf[0..4].copy_from_slice(&(length + 9).to_be_bytes());
@@ -364,9 +370,9 @@ pub fn send_handshake(sock: &mut TcpStream, my_id: &[u8; 20]) -> Result<()> {
 /// TODO make sure alex knows to clal this separately
 /// TODO make this handle partial recieves but its annoying and insanely unlikely for a handshake
 /// returns the peer id of the peer that sent the handshake
-pub fn recv_handshake(peer:&mut Peer) -> Result<Vec<u8>> {
+pub fn recv_handshake(peer: &mut Peer) -> Result<Vec<u8>> {
     let sock = peer.get_mut_socket();
-    
+
     let mut buf: Vec<u8> = vec![0; 68];
     sock.read_exact(&mut buf)?;
 
@@ -388,7 +394,9 @@ pub fn recv_handshake(peer:&mut Peer) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use bitvec::slice::BitSlice;
     use mio::net::{TcpListener, TcpStream};
+    use rusty_fork::rusty_fork_test;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
     fn networking_setup(port: u16) -> (TcpStream, TcpStream) {
@@ -406,55 +414,470 @@ mod test {
         (self_sock, other_sock)
     }
 
-    #[test]
-    fn test_p2p_handshakes()->Result<()> {
-        // Set up networking.
-        let (self_sock, mut other_sock) = networking_setup(8001);
+    rusty_fork_test! {
+        #[test]
+        fn test_p2p_handshakes() {
+            // Set up networking.
+            let (self_sock, mut other_sock) = networking_setup(8001);
 
-        // Create a peer, give it the TcpStream, and then see if the stream
-        // can be written to and read from.
-        let mut peer = Peer::new(&[b'a'; 20], self_sock);
-        let get_sock = peer.get_mut_socket();
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut peer = Peer::new(&[b'a'; 20], self_sock);
+            let get_sock = peer.get_mut_socket();
 
-        //send handshake
-        send_handshake(&mut other_sock, &[b'a'; 20])?;
-        //recv handshake
-        dbg!(recv_handshake(&mut peer).unwrap());
+            //init torrent struct with infohash
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            //send handshake
+            send_handshake(&mut other_sock, &[b'a'; 20]).unwrap();
+            //recv handshake
+            dbg!(recv_handshake(&mut peer).unwrap());
 
 
-        Ok(())
+        }
     }
 
-    #[test]
-    fn test_p2p_send_msgs()->Result<()> {
-        // Set up networking.
-        let (self_sock, mut other_sock) = networking_setup(8002);
+    rusty_fork_test! {
+        #[test]
+        // makes sure theres no error sending, does not validate contents yet
+        fn test_p2p_send_msgs() {
+           // Set up networking.
+           let (self_sock, other_sock) = networking_setup(8002);
 
-        // Create a peer, give it the TcpStream, and then see if the stream
-        // can be written to and read from.
-        let mut peer = Peer::new(&[b'a'; 20], self_sock);
-        let get_sock = peer.get_mut_socket();
+           // Create a peer, give it the TcpStream, and then see if the stream
+           // can be written to and read from.
+           let mut sender = Peer::new(&[b'a'; 20], self_sock);
 
-        //send handshake
-        send_handshake(&mut other_sock, &[b'a'; 20])?;
-        //recv handshake
-        dbg!(recv_handshake(&mut peer).unwrap());
+           torrent::parse_torrent_file("../artofwar.torrent");
 
-        // // Write
-        // let string = b"test";
-        // dbg!(get_sock.write(string).unwrap());
-        // let mut buf: [u8; 4] = [0; 4];
-        // dbg!(other_sock.read(&mut buf).unwrap());
-        // dbg!(std::str::from_utf8(&buf).unwrap());
-        // assert_eq!(string, &buf);
+           let my_id = &[b'a'; 20];
 
-        // // Read
-        // let string = b"helo";
-        // dbg!(other_sock.write(string).unwrap());
-        // dbg!(get_sock.read(&mut buf).unwrap());
-        // dbg!(std::str::from_utf8(&buf).unwrap());
-        // assert_eq!(string, &buf);
+           let choke = MessageType::Choke;
+           let unchoke = MessageType::Unchoke;
+           let interested = MessageType::Interested;
+           let not_interested = MessageType::NotInterested;
+           let have = MessageType::Have { index: 23 };
 
-        Ok(())
+           let bv:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1]);
+           let bitfield = MessageType::Bitfield {
+               field: bv,
+           };
+           let request = MessageType::Request {
+               index: 1,
+               begin: 2,
+               length: 3,
+           };
+           let piece = MessageType::Piece {
+               index: 4,
+               begin: 5,
+               block: vec![6; 7],
+           };
+           let cancel = MessageType::Cancel {
+               index: 8,
+               begin: 9,
+               length: 10,
+           };
+           let keep_alive = MessageType::KeepAlive;
+
+
+           sender.get_mut_messages().messages.push(choke);
+           sender.get_mut_messages().messages.push(unchoke);
+           sender.get_mut_messages().messages.push(interested);
+           sender.get_mut_messages().messages.push(not_interested);
+           sender.get_mut_messages().messages.push(have);
+           sender.get_mut_messages().messages.push(bitfield);
+           sender.get_mut_messages().messages.push(request);
+           sender.get_mut_messages().messages.push(piece);
+           sender.get_mut_messages().messages.push(cancel);
+           sender.get_mut_messages().messages.push(keep_alive);
+
+
+           let messages = sender.get_messages_clone();
+           sender.reset_messages();
+
+           let get_sock = sender.get_mut_socket();
+           messages.send_messages(get_sock).unwrap();
+
+        }
+    }
+
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_have() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8005);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let have = MessageType::Have { index: 23 };
+            sender.get_mut_messages().messages.push(have.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], have);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_bitfield() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8006);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let bv:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1,1,1]);
+            let bitfield = MessageType::Bitfield {
+                field: bv,
+            };
+            sender.get_mut_messages().messages.push(bitfield.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], bitfield);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_request() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8007);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let request = MessageType::Request {
+                index: 1,
+                begin: 2,
+                length: 3,
+            };
+            sender.get_mut_messages().messages.push(request.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], request);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_piece() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8008);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let piece = MessageType::Piece {
+                index: 4,
+                begin: 5,
+                block: vec![6; 7],
+            };
+            sender.get_mut_messages().messages.push(piece.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], piece);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_cancel() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8009);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let cancel = MessageType::Cancel {
+                index: 8,
+                begin: 9,
+                length: 10,
+            };
+            sender.get_mut_messages().messages.push(cancel.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], cancel);
+        }
+    }
+    
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_keepalive() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8010);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let keep_alive = MessageType::KeepAlive;
+            sender.get_mut_messages().messages.push(keep_alive.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], keep_alive);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_choke() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8011);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let choke = MessageType::Choke;
+            sender.get_mut_messages().messages.push(choke.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], choke);
+        }
+    }
+
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_unchoke() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8012);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let unchoke = MessageType::Unchoke;
+            sender.get_mut_messages().messages.push(unchoke.clone());
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], unchoke);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_interested() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8013);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let interested = MessageType::Interested;
+            sender.get_mut_messages().messages.push(interested.clone());
+            
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+            
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+            
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], interested);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_send_recv_not_interested() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8014);
+            
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+            
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let not_interested = MessageType::NotInterested;
+            sender.get_mut_messages().messages.push(not_interested.clone());
+            
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+            
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+            
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            assert_eq!(recieved_messages.messages[0], not_interested);
+        }
+    }
+
+    rusty_fork_test! {
+        #[test]
+        fn test_p2p_recv_all() {
+            // Set up networking.
+            let (self_sock, other_sock) = networking_setup(8003);
+
+            // Create a peer, give it the TcpStream, and then see if the stream
+            // can be written to and read from.
+            let mut sender = Peer::new(&[b'a'; 20], self_sock);
+            let mut reciever = Peer::new(&[b'a'; 20], other_sock);
+
+
+            torrent::parse_torrent_file("../artofwar.torrent");
+
+            let my_id = &[b'a'; 20];
+
+            let choke = MessageType::Choke;
+            let unchoke = MessageType::Unchoke;
+            let interested = MessageType::Interested;
+            let not_interested = MessageType::NotInterested;
+            let have = MessageType::Have { index: 23 };
+
+            let bv:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1,1,1]);
+            let bitfield = MessageType::Bitfield {
+                field: bv,
+            };
+            let request = MessageType::Request {
+                index: 1,
+                begin: 2,
+                length: 3,
+            };
+            let piece = MessageType::Piece {
+                index: 4,
+                begin: 5,
+                block: vec![6; 7],
+            };
+            let cancel = MessageType::Cancel {
+                index: 8,
+                begin: 9,
+                length: 10,
+            };
+            let keep_alive = MessageType::KeepAlive;
+
+
+            sender.get_mut_messages().messages.push(choke.clone());
+            sender.get_mut_messages().messages.push(unchoke.clone());
+            sender.get_mut_messages().messages.push(interested.clone());
+            sender.get_mut_messages().messages.push(not_interested.clone());
+            sender.get_mut_messages().messages.push(have.clone());
+            sender.get_mut_messages().messages.push(bitfield.clone());
+            sender.get_mut_messages().messages.push(request.clone());
+            sender.get_mut_messages().messages.push(piece.clone());
+            sender.get_mut_messages().messages.push(cancel.clone());
+            sender.get_mut_messages().messages.push(keep_alive.clone());
+
+
+            let messages = sender.get_messages_clone();
+            sender.reset_messages();
+
+            let get_sock = sender.get_mut_socket();
+            messages.send_messages(get_sock).unwrap();
+
+            dbg!(reciever.get_mut_messages());
+            handle_messages(&mut reciever).unwrap();
+            let recieved_messages = reciever.get_messages_clone();
+            dbg!(reciever.get_mut_messages());
+            
+            assert_eq!(recieved_messages.messages[0], choke);
+            assert_eq!(recieved_messages.messages[1], unchoke);
+            assert_eq!(recieved_messages.messages[2], interested);
+            assert_eq!(recieved_messages.messages[3], not_interested);
+            assert_eq!(recieved_messages.messages[4], have);
+            assert_eq!(recieved_messages.messages[5], bitfield);
+            assert_eq!(recieved_messages.messages[6], request);
+            assert_eq!(recieved_messages.messages[7], piece);
+            assert_eq!(recieved_messages.messages[8], cancel);  
+            assert_eq!(recieved_messages.messages[9], keep_alive);
+            assert_eq!(recieved_messages.messages.len(), 10);
+
+        }
     }
 }
