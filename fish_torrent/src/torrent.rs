@@ -35,8 +35,7 @@ struct Torrent {
 
     //non-encoded info, computed by me
     #[serde(default)]
-    //info_hash: Vec<u8>, // 20 byte SHA1 hashvalue of the swarm
-    info_hash: [u8; 20],
+    info_hash: Vec<u8>, // 20 byte SHA1 hashvalue of the swarm
     #[serde(default)]
     torrent_mode: TorrentMode, // single file or multiple file mode. tells you how to deal with the fields of Info (info.files or info.)
 }
@@ -90,8 +89,7 @@ pub fn parse_torrent_file(filename: &str) {
     hash.update(infodata);
 
     let torrent = Torrent {
-        //info_hash: hash.finalize().to_vec(),
-        info_hash: {let mut h = [0; 20]; hash.finalize_into(&mut h.into()); h},
+        info_hash: hash.finalize().to_vec(),
         torrent_mode: {
             if torrent.info.files.len() > 0 {
                 TorrentMode::MultipleFile
@@ -113,9 +111,8 @@ pub fn parse_torrent_file(filename: &str) {
 }
 
 /// 20 byte SHA1 hashvalue of the swarm
-pub fn get_info_hash() -> [u8; 20] {//&'static Vec<u8> { // Tien causing chaos
-    //&TORRENT.get().unwrap().info_hash
-    TORRENT.get().unwrap().info_hash
+pub fn get_info_hash() -> &'static Vec<u8> {
+    &TORRENT.get().unwrap().info_hash
 }
 
 /// url of the tracker
