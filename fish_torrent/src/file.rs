@@ -86,7 +86,7 @@ impl OutputFile {
 
             let finished = self.is_piece_finished(index)?;
             if finished == true {
-                file_bitfield.set(i, true);
+                self.file_bitfield.set(i, true);
             }
             Ok(finished)
         }
@@ -248,7 +248,7 @@ mod test {
     }
 
     #[test]
-    fn test_bitvec() {
+    fn test_bitvecs() {
         let filename = "file.rs.test_bitvec.output";
         let _ = fs::remove_file(filename);
         let num_pieces = 5;
@@ -303,6 +303,7 @@ mod test {
         assert_eq!(test_file.pieces[1].get(7).as_deref().unwrap(), &false);
 
         // This should fully fill the piece and return true.
+        assert_eq!(test_file.get_file_bitfield().get(1), false);
         assert_eq!(
             test_file
                 .write_block(
@@ -313,6 +314,7 @@ mod test {
                 .unwrap(),
             true
         );
+        assert_eq!(test_file.get_file_bitfield().get(1), true);
         //dbg!(&test_file.pieces[1]);
     }
 
