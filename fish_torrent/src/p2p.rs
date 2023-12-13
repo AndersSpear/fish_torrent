@@ -259,7 +259,7 @@ impl MessageType {
             MessageType::Have { index } => {
                 send_have(sock, index)?;
             }
-            MessageType::Bitfield { mut field } => {
+            MessageType::Bitfield { field } => {
                 send_bitfield(sock, field)?;
             }
             MessageType::Request {
@@ -371,10 +371,10 @@ pub fn send_handshake(peer: &mut Peer, my_id: &[u8; 20], file: &OutputFile) -> R
     buf[48..68].copy_from_slice(my_id);
     sock.write_all(&buf)?;
 
-
     //TODO GET THE BITFIELD
-    peer.messages.messages.push(MessageType::Bitfield { field: file.get_file_bitfield()  });
-
+    peer.messages.messages.push(MessageType::Bitfield {
+        field: file.get_file_bitfield(),
+    });
 
     Ok(())
 }
@@ -432,8 +432,13 @@ mod test {
         let mut buf = Vec::new();
         match self_sock.read_to_end(&mut buf) {
             Ok(_) => dbg!("sweet"),
-            Err(e) => if e.kind() == std::io::ErrorKind::WouldBlock { dbg!("dude") }
-                        else { dbg!("fuck") },
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::WouldBlock {
+                    dbg!("dude")
+                } else {
+                    dbg!("fuck")
+                }
+            }
         };
     }
 
@@ -773,7 +778,7 @@ mod test {
             // can be written to and read from.
             let mut sender = Peer::new(self_sock);
             let mut reciever = Peer::new(other_sock);
-            
+
             torrent::parse_torrent_file("../artofwar.torrent");
 
             let interested = MessageType::Interested;
@@ -801,7 +806,7 @@ mod test {
             // can be written to and read from.
             let mut sender = Peer::new(self_sock);
             let mut reciever = Peer::new(other_sock);
-            
+
             torrent::parse_torrent_file("../artofwar.torrent");
 
             let not_interested = MessageType::NotInterested;

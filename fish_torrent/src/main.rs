@@ -202,7 +202,11 @@ fn main() {
                         if let Ok(peer) = peer_list.add_peer(peer_addr, socket, None) {
                             let token = get_new_token();
                             poll.registry()
-                                .register(peer.get_mut_socket(), token, Interest::WRITABLE | Interest::READABLE)
+                                .register(
+                                    peer.get_mut_socket(),
+                                    token,
+                                    Interest::WRITABLE | Interest::READABLE,
+                                )
                                 .expect(&format!("failed to register peer {:?}", peer_addr));
                             sockets.insert(token, peer_addr);
                         } else {
@@ -248,7 +252,9 @@ fn main() {
                                     .deregister(&mut tracker_sock)
                                     .expect("tracker deregister fail");
 
-                                tracker_sock.shutdown(net::Shutdown::Both).expect("tracker was not shutdown :(");
+                                tracker_sock
+                                    .shutdown(net::Shutdown::Both)
+                                    .expect("tracker was not shutdown :(");
                                 dbg!("tracker shutdown!!");
                             }
                             None => {
@@ -300,17 +306,19 @@ fn main() {
                         let peer = peer_list.find_peer(peer_addr).unwrap();
                         if peer.is_complete() {
                             handle_peer(peer, &mut output_file);
-                        } 
+                        }
                         // no we havent
                         else {
                             if event.is_readable() {
                                 dbg!("Got a handshake from peer");
                                 let peer_id = p2p::recv_handshake(peer.get_mut_socket()).unwrap();
-                                peer_list.complete_peer(peer_addr, &peer_id.try_into().unwrap()).unwrap();
-                            }
-                            else if event.is_writable() {
+                                peer_list
+                                    .complete_peer(peer_addr, &peer_id.try_into().unwrap())
+                                    .unwrap();
+                            } else if event.is_writable() {
                                 dbg!("Sent a handshake to peer");
-                                p2p::send_handshake(peer, &self_info.peer_id, &output_file).expect("failed to send handshake");
+                                p2p::send_handshake(peer, &self_info.peer_id, &output_file)
+                                    .expect("failed to send handshake");
                                 // only care about readable events from now on
                                 poll.registry()
                                     .reregister(peer.get_mut_socket(), token, Interest::READABLE)
@@ -340,7 +348,11 @@ fn add_all_peers(
             if let Ok(peer) = peer_list.add_peer(peer_addr, socket, None) {
                 let token = get_new_token();
                 poll.registry()
-                    .register(peer.get_mut_socket(), token, Interest::WRITABLE | Interest::READABLE)
+                    .register(
+                        peer.get_mut_socket(),
+                        token,
+                        Interest::WRITABLE | Interest::READABLE,
+                    )
                     .expect(&format!("failed to register peer {:?}", peer_addr));
                 sockets.insert(token, peer_addr);
                 dbg!(format!(
@@ -383,33 +395,50 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
             MessageType::NotInterested => {
                 peer.peer_interested = false;
             }
-            MessageType::Have{index} => {
+            MessageType::Have { index } => {
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
-            MessageType::Bitfield{field} => {
+            MessageType::Bitfield { field } => {
                 peer.init_piece_bitfield(field);
             }
-            MessageType::Request{index, begin, length} => {
+            MessageType::Request {
+                index,
+                begin,
+                length,
+            } => {
                 // check if we are choking them? or do we just send?
-                peer.push_request(index.try_into().unwrap(), begin.try_into().unwrap(), length.try_into().unwrap());
+                peer.push_request(
+                    index.try_into().unwrap(),
+                    begin.try_into().unwrap(),
+                    length.try_into().unwrap(),
+                );
             }
-            MessageType::Piece{index, begin, block} => {
-                output_file.write_block(index.try_into().unwrap(), begin.try_into().unwrap(), block).expect("failed to write block");
+            MessageType::Piece {
+                index,
+                begin,
+                block,
+            } => {
+                output_file
+                    .write_block(index.try_into().unwrap(), begin.try_into().unwrap(), block)
+                    .expect("failed to write block");
             }
-            MessageType::Cancel{index, begin, length} => {
+            MessageType::Cancel {
+                index,
+                begin,
+                length,
+            } => {
                 // remove them as being interested ??
                 // peer.remove_request(index, begin, length);
             }
             MessageType::KeepAlive => {
                 // uh i dont htink we do anything hrere yet
                 // reset a peer timeout if we ever implement that
-            }
-            // MessageType::Undefined => {
-            //     // does this still exist questio mark
-            // }
-            // MessageType::HandshakeResponse => {
-            //     // do i care?
-            // }
+            } // MessageType::Undefined => {
+              //     // does this still exist questio mark
+              // }
+              // MessageType::HandshakeResponse => {
+              //     // do i care?
+              // }
         }
     }
 }

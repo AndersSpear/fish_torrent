@@ -92,9 +92,11 @@ impl Peer {
     pub fn pop_request(&mut self) -> Option<Request> {
         self.piece_requests.pop()
     }
-    
+
     pub fn remove_request(&mut self) -> Option<Request> {
         unimplemented!();
+        // loop thru vec
+        // remove
     }
 
     pub fn get_mut_recv_buffer(&mut self) -> &mut Vec<u8> {
