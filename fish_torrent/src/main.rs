@@ -44,12 +44,13 @@ struct Args {
 }
 
 struct SelfInfo {
-    // TODO: trackerid ??
+    tracker_id:[u8; 20],
     peer_id: [u8; 20],
     port: u16,
     uploaded: usize,
     downloaded: usize,
     left: usize,
+    tracker_event: Event
 }
 
 /// main handles the initialization of stuff and keeping the event loop logic going
@@ -59,11 +60,13 @@ fn main() {
 
     // things i own :)
     let mut self_info = SelfInfo {
+        tracker_id: [0; 20],
         peer_id: [0; 20],
         port: args.port,
         uploaded: 0,
         downloaded: 0,
         left: 0,
+        tracker_event: Event::STARTED,
     };
     let mut peer_list = Peers::new();
     let mut sockets: HashMap<Token, SocketAddr> = HashMap::new();
@@ -219,6 +222,11 @@ fn main() {
                                 // yay we got a full response, time to do things :)
                                 tracker_timeout =
                                     Duration::new(tracker_response.interval.try_into().unwrap(), 0);
+                                
+                                // if let Some(tracker_id) = tracker_response.tracker_id {
+                                //     self_info.tracker_id = tracker_response.tracker_id;
+                                // }
+
                                 add_all_peers(
                                     &mut poll,
                                     &mut peer_list,
@@ -238,16 +246,20 @@ fn main() {
                     // is it a writable ?? (blast message out)
                     else if event.is_writable() {
                         let tracker_request = TrackerRequest::new(
-                            "aaaaaaaaaaaaaaaaaaaa",
-                            // self_info.peer_id,
-                            "bbbbbbbbbbbbbbbbbbbb",
+                            get_info_hash(),
+                            self_info.peer_id,
                             self_info.port,
                             self_info.uploaded,
                             self_info.downloaded,
                             self_info.left,
-                            Event::STARTED,
+                            self_info.tracker_event,
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
+                        
+                        if self_info.tracker_event == Event::STARTED {
+                            self_info.tracker_event = Event::PERIODIC;
+                        }
+
                         poll.registry()
                             .reregister(&mut tracker_sock, TRACKER, Interest::READABLE)
                             .expect("tracker rereg fail");
@@ -259,7 +271,10 @@ fn main() {
                     if event.is_error() || event.is_read_closed() {
                         let peer_addr = sockets.remove(&token).unwrap();
                         let peer = peer_list.remove_peer(peer_addr).unwrap();
-                        peer.disconnect(); 
+                        // you cant shutdown a non connected socket (as we have figured out very quickly)
+                        if event.is_read_closed() {
+                            peer.disconnect(); 
+                        }
                         continue;
                     }
 
@@ -292,7 +307,7 @@ fn add_all_peers(
                     .register(socket, token, Interest::READABLE)
                     .expect(&format!("failed to register peer {:?}", peer_addr));
                 sockets.insert(token, peer_addr);
-                dbg!(format!("connected and added peer {:?} with token {:?}", peer_addr, token));
+                dbg!(format!("syn'd and added peer {:?} with token {:?}", peer_addr, token));
             } else {
                 println!("already connected to peer {:?}", peer_addr);
             }

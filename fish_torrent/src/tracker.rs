@@ -42,6 +42,7 @@ pub struct TrackerRequest {
     event: Event,
 }
 
+#[derive(PartialEq)]
 pub enum Event {
     STARTED,
     STOPPED,
