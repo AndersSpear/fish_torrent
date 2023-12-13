@@ -303,7 +303,7 @@ mod test {
         assert_eq!(test_file.pieces[1].get(7).as_deref().unwrap(), &false);
 
         // This should fully fill the piece and return true.
-        assert_eq!(test_file.get_file_bitfield().get(1), false);
+        assert_eq!(test_file.get_file_bitfield()[1], false);
         assert_eq!(
             test_file
                 .write_block(
@@ -314,7 +314,7 @@ mod test {
                 .unwrap(),
             true
         );
-        assert_eq!(test_file.get_file_bitfield().get(1), true);
+        assert_eq!(test_file.get_file_bitfield()[1], true);
         //dbg!(&test_file.pieces[1]);
     }
 
