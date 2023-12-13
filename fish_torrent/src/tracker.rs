@@ -93,7 +93,7 @@ impl TrackerRequest {
             )
         } else {
             format!(
-                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=0 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
+                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
                 self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left)
         }
     }
