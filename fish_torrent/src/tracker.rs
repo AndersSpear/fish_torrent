@@ -239,8 +239,8 @@ mod tests {
     #[test]
     fn test_construct_tracker_request() {
         let tr = TrackerRequest::new(
-            "aaaaaaaaaaaaaaaaaaaa",
-            "bbbbbbbbbbbbbbbbbbbb",
+            &Vec::from("aaaaaaaaaaaaaaaaaaaa"),
+            &Vec::from("bbbbbbbbbbbbbbbbbbbb"),
             6881,
             0,
             0,
@@ -256,8 +256,8 @@ mod tests {
     #[test]
     fn test_send_tracker_request() {
         let tracker_request = TrackerRequest::new(
-            "aaaaaaaaaaaaaaaaaaaa",
-            "bbbbbbbbbbbbbbbbbbbb",
+            &Vec::from("aaaaaaaaaaaaaaaaaaaa"),
+            &Vec::from("bbbbbbbbbbbbbbbbbbbb"),
             6881,
             0,
             0,
@@ -281,8 +281,8 @@ mod tests {
     #[test]
     fn test_handle_tracker_response() {
         let tracker_request = TrackerRequest::new(
-            "aaaaaaaaaaaaaaaaaaaa",
-            "bbbbbbbbbbbbbbbbbbbb",
+            &Vec::from("aaaaaaaaaaaaaaaaaaaa"),
+            &Vec::from("bbbbbbbbbbbbbbbbbbbb"),
             6881,
             0,
             0,

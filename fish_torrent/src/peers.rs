@@ -96,6 +96,26 @@ impl Peer {
     pub fn remove_request(&mut self) -> Option<Request> {
         unimplemented!();
     }
+
+    pub fn get_mut_recv_buffer(&mut self) -> &mut Vec<u8> {
+        &mut self.recv_buffer
+    }
+
+    pub fn get_mut_messages(&mut self) -> &mut Messages {
+        &mut self.messages
+    }
+
+    pub fn get_messages_clone(&self) -> Messages {
+        self.messages.clone()
+    }
+
+    pub fn reset_messages(&mut self) {
+        self.messages = Messages::new();
+    }
+
+    pub fn set_messages(&mut self, messages: Messages) {
+        self.messages = messages;
+    }
 }
 
 impl PartialEq for Peer {
@@ -269,7 +289,7 @@ mod test {
 
         // Create a peer, give it the TcpStream, and then see if the stream
         // can be written to and read from.
-        let mut peer = Peer::new(&[b'a'; 20], self_sock);
+        let mut peer = Peer::new(self_sock);
         let get_sock = peer.get_mut_socket();
 
         // Write
