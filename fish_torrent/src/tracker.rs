@@ -50,12 +50,12 @@ pub enum Event {
 }
 
 impl Event {
-    fn as_str(&self) -> &str {
+    fn as_str(&self) -> Option<&str> {
         match self {
-            Event::STARTED => "started",
-            Event::STOPPED => "stopped",
-            Event::COMPLETED => "completed",
-            Event::PERIODIC => "periodic", // or an empty string if you prefer
+            Event::STARTED => Some("started"),
+            Event::STOPPED => Some("stopped"),
+            Event::COMPLETED => Some("completed"),
+            Event::PERIODIC => None, // or an empty string if you prefer
         }
     }
 }
@@ -85,13 +85,17 @@ impl TrackerRequest {
         // Tien removed these because info_hash and peer_id are encoding in new() now.
         //let encoded_info_hash = encode(&self.info_hash);
         //let encoded_peer_id = encode(&self.peer_id);
-        let event_str = self.event.as_str();
-
-        format!(
-            "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
-            //encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
-            self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
-        )
+        if let Some(event_str) = self.event.as_str() {
+            format!(
+                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
+                //encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
+                self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
+            )
+        } else {
+            format!(
+                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=0 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
+                self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left)
+        }
     }
 }
 
