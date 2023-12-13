@@ -16,14 +16,14 @@ use crate::torrent::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TrackerResponseBeta {
-    interval: u64,
+    interval: usize,
     #[serde(with = "serde_bytes")]
     peers: Vec<u8>, // Assuming compact format
 }
 
 #[derive(Debug)]
 pub struct TrackerResponse {
-    pub interval: u64,
+    pub interval: usize,
     pub socket_addr_list: Vec<SocketAddr>,
 }
 
@@ -36,9 +36,9 @@ pub struct TrackerRequest {
     info_hash: String,
     peer_id: String,
     port: u16,
-    uploaded: u64,
-    downloaded: u64,
-    left: u64,
+    uploaded: usize,
+    downloaded: usize,
+    left: usize,
     event: Event,
 }
 
@@ -65,9 +65,9 @@ impl TrackerRequest {
         info_hash: &str,
         peer_id: &str,
         port: u16,
-        uploaded: u64,
-        downloaded: u64,
-        left: u64,
+        uploaded: usize,
+        downloaded: usize,
+        left: usize,
         event: Event,
     ) -> TrackerRequest {
         TrackerRequest {
