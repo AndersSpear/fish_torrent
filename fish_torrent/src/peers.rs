@@ -151,6 +151,7 @@ impl Peers {
     pub fn remove_peer(&mut self, addr: SocketAddr) -> Option<Peer> {
         if self.list.contains_key(&addr) == true {
             self.list.remove(&addr)
+        }
         else {
             self.incomplete.remove(&addr)
         }
