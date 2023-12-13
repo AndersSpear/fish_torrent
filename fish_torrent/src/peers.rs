@@ -64,10 +64,10 @@ impl Peer {
         self.piece_bitfield = bitfield;
     }
 
-    pub fn disconnect(&self) {
+    pub fn disconnect(&self) -> Result<()> {
         self.socket
-            .shutdown(Shutdown::Both)
-            .expect(format!("Connection to {:?} failed", self.socket).as_str());
+            .shutdown(Shutdown::Both)?;
+        Ok(())
     }
 
     pub fn get_mut_socket(&mut self) -> &mut TcpStream {
