@@ -218,7 +218,7 @@ impl Peers {
     //}
     pub fn complete_peer(&mut self, addr: SocketAddr, peer_id: &[u8; 20]) -> Result<()> {
         if self.incomplete.contains_key(&addr) == true && self.list.contains_key(&addr) == false {
-            let peer = self.incomplete.remove(&addr).unwrap();
+            let mut peer = self.incomplete.remove(&addr).unwrap();
             peer.peer_id = Some(*peer_id);
             self.list.insert(addr, peer);
             Ok(())
