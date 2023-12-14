@@ -390,7 +390,7 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
             MessageType::Bitfield { mut field } => {
-                let _ = field.drain(field.len() - (output_file.get_num_pieces() % 8)..);
+                let _ = field.drain(field.len() - (8 - (output_file.get_num_pieces() % 8))..);
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request {
@@ -445,7 +445,7 @@ fn create_peer_id() -> [u8; 20] {
 #[cfg(test)]
 mod test {
     use super::*;
-    use bitvec::{order::Msb0, vec::BitVec};
+    use bitvec::{order::Msb0, vec::BitVec, bits};
 
     #[test]
     #[ignore]
@@ -469,7 +469,26 @@ mod test {
         field.push(false);
 
         // should make bitvec [1, 0, 1]
-        let _ = field.drain(field.len() - (num_pieces % 8)..);
+        assert_eq!(field.len(), 8);
+        let _ = field.drain(field.len() - (8 - (num_pieces % 8))..);
+        dbg!(&field);
+        dbg!(&correct_field);
+        assert_eq!(field.len(), num_pieces);
+        assert_eq!(field, correct_field);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_bitfield_drain2() {
+        let num_pieces = 10;
+        let correct_field = BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 1, 1, 0, 1, 1, 0, 1, 1]);
+
+        let mut field = BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0]);
+        
+        assert_eq!(field.len(), 16);
+        let _ = field.drain(field.len() - (8 - (num_pieces % 8))..);
+        dbg!(&field);
+        dbg!(&correct_field);
         assert_eq!(field.len(), num_pieces);
         assert_eq!(field, correct_field);
     }

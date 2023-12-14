@@ -100,6 +100,7 @@ impl Strategy {
                     }
                     // they are not choking us and we can ask them for the piece :)))
                     else {
+                        // TODO: send more than one block at once?
                         let mut i = 0;
                         while i < file.get_piece_size()
                             && (file.is_block_finished(piece, i).unwrap()
