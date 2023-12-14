@@ -154,10 +154,15 @@ impl Strategy {
                         // to request from this peer. Otherwise, add a request.
                         if i < file.get_piece_size() {
                             // should send the next block we want to request for that piece
+                            let mut block_len: u32 = BLOCK_SIZE.try_into().unwrap();
+                            if file.get_piece_size() - i < BLOCK_SIZE {
+                                block_len = (file.get_piece_size() % BLOCK_SIZE) as u32;
+                            }
+
                             peer.get_mut_messages().messages.push(MessageType::Request {
                                 index: piece.try_into().unwrap(),
                                 begin: i.try_into().unwrap(),
-                                length: BLOCK_SIZE.try_into().unwrap(),
+                                length: block_len,
                             });
                             self.rqs.push(Request {
                                 peer_addr: *addr,
