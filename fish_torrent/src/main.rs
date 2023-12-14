@@ -490,7 +490,7 @@ fn handle_peer(
     let messages = peer.messages.messages.clone();
 
     for msg in messages {
-        if let MessageType::Piece{ index, begin, _ } = msg {
+        if let MessageType::Piece{ index, begin, .. } = msg {
             println!("Message is Piece with index {} and begin {}", index, begin);
         } else {
             println!("Message is {:?}", msg);
