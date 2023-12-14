@@ -527,6 +527,7 @@ fn handle_peer(
                         strategy_state
                             .push_update(Some(peer_addr), MessageType::Have { index: index });
                     } else {
+                        dbg!(format!("Hash for piece {} does not match >:(", index));
                         // otherwise, something went wrong when downloading the piece so lets try again :)
                         output_file
                             .clear_piece(index.try_into().unwrap())
