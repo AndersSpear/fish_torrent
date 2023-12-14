@@ -13,6 +13,8 @@ use sha1::{Digest, Sha1};
 use std::fs::read;
 use std::sync::OnceLock;
 
+use anyhow::{Error, Result};
+
 static TORRENT: OnceLock<Torrent> = OnceLock::new();
 
 /// part of the torrent struct so you know how to parse the data
@@ -145,8 +147,12 @@ pub fn get_pieces() -> &'static Vec<u8> {
     &TORRENT.get().unwrap().info.pieces
 }
 
-pub fn get_piece_hash(index:usize) -> [u8;20]{
-    [0_u8;20]
+pub fn get_piece_hash(index: usize) -> Result<[u8; 20]> {
+    let pieces = &TORRENT.get().unwrap().info.pieces;
+    if index * 20 + 20 > pieces.len() {
+        return Err(Error::msg("lmao index out of bounds on getpiecehjash"));
+    }
+    Ok(TORRENT.get().unwrap().info.pieces[(index) * 20..index * 20 + 20].try_into()?)
 }
 
 /// file length in bytes
@@ -186,6 +192,15 @@ mod test {
             hex::decode("a994e40f6c625f26834dfaafcb40d5c5f59fa648").unwrap()
         );
     }}
+
+    rusty_fork_test! {
+        #[test]
+        fn test_get_piece_hash(){
+            //TODO write this
+            assert_eq!(1,0);
+
+        }
+    }
 
     rusty_fork_test! {
     #[test]
