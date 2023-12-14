@@ -61,12 +61,13 @@ pub enum MessageType {
 
 /// sends all messages in the peers struct
 pub fn send_all(peers: &mut Peers) -> Result<(), Error> {
-    unimplemented!();
 
-    // for peer in peers {
-    //     peer.messages.send_messages()?;
-    // }
-    // Ok(())
+    for (_, peer) in peers.get_peers_list() {
+        let msgs = peer.messages.clone();
+        peer.messages = Messages::new();
+        msgs.send_messages(peer.get_mut_socket())?;
+    }
+    Ok(())
 }
 
 impl Messages {
