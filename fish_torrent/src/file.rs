@@ -177,6 +177,10 @@ impl OutputFile {
         }
     }
 
+    pub fn is_block_finished(&self, index: usize, begin: usize) -> Option<bool> {
+        self.blocks[index].get(begin / BLOCK_SIZE).as_deref().copied()
+    }
+
     /// Check to see if the piece was finished.
     fn is_piece_finished(&self, index: usize) -> Result<bool> {
         let bound = if index == self.num_pieces - 1 {

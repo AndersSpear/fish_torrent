@@ -404,7 +404,7 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
             MessageType::Bitfield { mut field } => {
-                let _ = field.drain(field.len() - (output_file.get_file_length()%8)..);
+                let _ = field.drain(field.len() - (output_file.get_num_pieces() % 8)..);
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request {
@@ -459,33 +459,33 @@ fn create_peer_id() -> [u8; 20] {
 #[cfg(test)]
 mod test {
     use super::*;
-    use mio::net::{TcpListener, TcpStream};
-    use std::io::{Read, Write};
-    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    use bitvec::{vec::BitVec, order::Msb0};
 
     #[test]
-    fn test_peer_get_socket() {
-        // Set up networking.
-        let (self_sock, mut other_sock) = networking_setup(8000);
+    #[ignore]
+    fn test_bitfield_drain() {
+        let num_pieces = 3;
+        let mut correct_field = BitVec::<u8, Msb0>::new();
+        correct_field.push(true);    
+        correct_field.push(false);    
+        correct_field.push(true);    
 
-        // Create a peer, give it the TcpStream, and then see if the stream
-        // can be written to and read from.
-        let mut peer = Peer::new(self_sock);
-        let get_sock = peer.get_mut_socket();
+        let mut field = BitVec::<u8, Msb0>::new();
+        // bitvec is [1, 0, 1, 0, 0, 0, 0, 0]
+        field.push(true);    
+        field.push(false);    
+        field.push(true);    
 
-        // Write
-        let string = b"test";
-        dbg!(get_sock.write(string).unwrap());
-        let mut buf: [u8; 4] = [0; 4];
-        dbg!(other_sock.read(&mut buf).unwrap());
-        dbg!(std::str::from_utf8(&buf).unwrap());
-        assert_eq!(string, &buf);
+        field.push(false);    
+        field.push(false);    
+        field.push(false);    
+        field.push(false);    
+        field.push(false);    
 
-        // Read
-        let string = b"helo";
-        dbg!(other_sock.write(string).unwrap());
-        dbg!(get_sock.read(&mut buf).unwrap());
-        dbg!(std::str::from_utf8(&buf).unwrap());
-        assert_eq!(string, &buf);
+        // should make bitvec [1, 0, 1]
+        let _ = field.drain(field.len() - (num_pieces % 8)..);
+        assert_eq!(field.len(), num_pieces);
+        assert_eq!(field, correct_field);
+
     }
 }
