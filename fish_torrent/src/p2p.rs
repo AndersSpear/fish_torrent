@@ -61,6 +61,7 @@ pub enum MessageType {
 
 /// sends all messages in the peers struct
 pub fn send_all(peers: &mut Peers) -> Result<(), Error> {
+    //dbg!(&peers);
     for (_, peer) in peers.get_peers_list() {
         let msgs = peer.messages.clone();
         peer.messages = Messages::new();
@@ -89,7 +90,9 @@ impl Messages {
         for msg in self.messages {
             msg.send(&mut sendbuf)?;
         }
+        dbg!("right about to send to {}", sock.peer_addr()?);
         sock.write_all(&sendbuf)?;
+        //dbg!("sent");
         Ok(())
     }
 }
@@ -140,7 +143,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
 // TODO make sure this handles handshakes smile
 /// tries to parse one message from the buffer
 fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
-    dbg!(buf.len());
+    
 
     if buf.len() < 4 {
         dbg!("less than 4 bytes in buffer");
@@ -201,7 +204,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                 5 => {
                     let field = BitVec::from_vec(buf[5..].to_vec());
                     buf.drain(0..5);
-                    buf.drain(0..field.len());
+                    buf.drain(0..(n as usize-1));
                     MessageType::Bitfield { field }
                 }
                 6 => {
@@ -263,6 +266,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
 
 impl MessageType {
     fn send(self, buf: &mut Vec<u8>) -> Result<(), Error> {
+        dbg!(&self);
         match self {
             MessageType::Choke => {
                 send_len_id(buf, 1, 0)?;

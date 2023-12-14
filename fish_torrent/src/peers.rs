@@ -138,6 +138,7 @@ impl PartialEq for Peer {
     }
 }
 
+#[derive(Debug)]
 pub struct Peers {
     list: HashMap<SocketAddr, Peer>,
     incomplete: HashMap<SocketAddr, Peer>,

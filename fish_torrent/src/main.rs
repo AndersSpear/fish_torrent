@@ -32,7 +32,7 @@ use crate::strategy::Strategy;
 use crate::torrent::*;
 use crate::tracker::*;
 
-const STRATEGY_TIMEOUT: Duration = Duration::new(0, 100000000); // 100 milliseconds
+const STRATEGY_TIMEOUT: Duration = Duration::new(0, 500000000); // 100 milliseconds
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -160,7 +160,7 @@ fn main() {
     loop {
         // timer for blasting send
         if strategy_timer.elapsed() > STRATEGY_TIMEOUT {
-            // dbg!("strategy timeout occurred !!");
+            dbg!("strategy timeout occurred !!");
             strategy_state.what_do(&mut peer_list, &mut output_file);
             p2p::send_all(&mut peer_list).expect("failed to send all");
             strategy_timer = Instant::now();
@@ -188,12 +188,14 @@ fn main() {
                 .expect("tracker register failed");
             tracker_timer = Instant::now();
         }
-
+        dbg!("about to poll");
         // calculate how much time is remaining for each of the timers
         let strategy_remaining = STRATEGY_TIMEOUT - strategy_timer.elapsed();
         let tracker_remaining = tracker_timeout - tracker_timer.elapsed();
         poll.poll(&mut events, Some(strategy_remaining.min(tracker_remaining)))
             .expect("poll_wait failed");
+        dbg!("poll done");
+
 
         // who did something
         for event in &events {
