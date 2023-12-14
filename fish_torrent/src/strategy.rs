@@ -10,6 +10,8 @@ use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
 use rand::random;
 
+use crate::file::BLOCK_SIZE;
+
 use super::file::OutputFile;
 use super::p2p::{MessageType, Messages};
 use super::peers::Peers;
@@ -65,6 +67,7 @@ impl Strategy {
 
         // Choose pieces to focus on.
         // THIS CODE IS LIKE O(N2) IM SORRY OK 😭
+        // 🐒
         let num_avail_spots = self.max_simul_pieces - self.focused_pieces.len();
         for _ in 0..num_avail_spots {
             //let r = random() % pieces_left.len; // NEEDS A BOUND LOL // i gave bound :)
@@ -82,13 +85,56 @@ impl Strategy {
 
         // Requesting and fulfilling requests.
         for (addr, peer) in peers.get_peers_list() {
-            //for self.focused_pi
+            // see if we can do anything with the pieces that the peer has
+            for &piece in &self.focused_pieces {
+                // the peer says they have the piece we want 🧩
+                if peer.check_piece_bitfield(piece).unwrap() {
+                    // but they are choking us :(((( 🐒
+                    if peer.peer_choking {
+                        peer.get_mut_messages()
+                            .messages
+                            .push(MessageType::Interested);
+                    }
+                    // they are not choking us and we can ask them for the piece :)))
+                    else {
+                        let mut i = 0;
+                        while file.is_block_finished(piece, i).unwrap() {
+                            i += 1;
+                        }
+
+                        // should send the next block we want to request for that piece
+                        peer.get_mut_messages().messages.push(MessageType::Request {
+                            index: piece.try_into().unwrap(),
+                            begin: i.try_into().unwrap(),
+                            length: BLOCK_SIZE.try_into().unwrap(),
+                        });
+                        self.rqs.push(Request {
+                            peer_addr: *addr,
+                            index: piece,
+                            begin: i,
+                            length: BLOCK_SIZE,
+                        })
+                    }
+                }
+            }
+
+            // we are only popping one request at a time because i hate you peers 🦀
+            if let Some(req) = peer.pop_request() {
+                peer.get_mut_messages().messages.push(MessageType::Piece {
+                    index: req.index.try_into().unwrap(),
+                    begin: req.begin.try_into().unwrap(),
+                    block: file
+                        .read_block(req.index, req.begin, BLOCK_SIZE)
+                        .expect("could not get block"),
+                });
+            }
+
             // For every focused piece
-                // Does peer have what I want?
-                // If so, are we unchoked?
-                    // Then request
-                    // Check which blocks we haven't requested and request those (hashset)
-                // Else, interested
+            // Does peer have what I want?
+            // If so, are we unchoked?
+            // Then request
+            // Check which blocks we haven't requested and request those (hashset)
+            // Else, interested
             //determine which blocks I want to request
         }
     }

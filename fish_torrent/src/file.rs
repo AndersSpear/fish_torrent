@@ -11,7 +11,7 @@ use sha1::{Digest, Sha1};
 
 use anyhow::{Error, Result};
 
-const BLOCK_SIZE: usize = 16000; //bytes
+pub const BLOCK_SIZE: usize = 16000; //bytes
 
 pub struct OutputFile {
     file: File,
@@ -70,7 +70,7 @@ impl OutputFile {
     pub fn get_file_length(&self) -> usize {
         self.length
     }
-    
+
     pub fn get_num_pieces(&self) -> usize {
         self.num_pieces
     }
@@ -178,16 +178,19 @@ impl OutputFile {
     }
 
     pub fn is_block_finished(&self, index: usize, begin: usize) -> Option<bool> {
-        self.blocks[index].get(begin / BLOCK_SIZE).as_deref().copied()
+        self.blocks[index]
+            .get(begin / BLOCK_SIZE)
+            .as_deref()
+            .copied()
     }
 
     /// Check to see if the piece was finished.
     fn is_piece_finished(&self, index: usize) -> Result<bool> {
         let bound = if index == self.num_pieces - 1 {
-                        self.last_piece_size
-                    } else {
-                        self.piece_size
-                    };
+            self.last_piece_size
+        } else {
+            self.piece_size
+        };
         for i in 0..bound {
             let &bit = self.bytes[index].get(i).as_deref().expect(
                 "Unknown edge case where OutputFile.pieces was not
@@ -411,7 +414,5 @@ mod test {
     }
 
     #[test]
-    fn test_last_piece() {
-
-    }
+    fn test_last_piece() {}
 }

@@ -61,7 +61,6 @@ pub enum MessageType {
 
 /// sends all messages in the peers struct
 pub fn send_all(peers: &mut Peers) -> Result<(), Error> {
-
     for (_, peer) in peers.get_peers_list() {
         let msgs = peer.messages.clone();
         peer.messages = Messages::new();
@@ -85,7 +84,7 @@ impl Messages {
 
         // TODO catch if it would block
 
-        let mut sendbuf:Vec<u8> = vec![];
+        let mut sendbuf: Vec<u8> = vec![];
 
         for msg in self.messages {
             msg.send(&mut sendbuf)?;
@@ -305,7 +304,7 @@ impl MessageType {
                 send_request_or_cancel(buf, false, index, begin, length)?;
             }
             MessageType::KeepAlive => {
-                let b:[u8;4] = [0; 4];
+                let b: [u8; 4] = [0; 4];
                 buf.write_all(&b)?;
             }
         }

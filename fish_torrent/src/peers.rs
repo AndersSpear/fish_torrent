@@ -118,6 +118,10 @@ impl Peer {
     pub fn set_messages(&mut self, messages: Messages) {
         self.messages = messages;
     }
+
+    pub fn check_piece_bitfield(&mut self, index: usize) -> Option<bool> {
+        self.piece_bitfield.get(index).as_deref().copied()
+    }
 }
 
 impl PartialEq for Peer {

@@ -18,16 +18,17 @@ use clap::Parser;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use peers::Peer;
+use rand::distributions::{Alphanumeric, DistString};
+use rand::{thread_rng, Rng};
 use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::{Duration, Instant};
 use url::Url;
-use rand::{Rng, thread_rng};
-use rand::distributions::{Alphanumeric, DistString};
 
 use crate::file::OutputFile;
 use crate::p2p::MessageType;
 use crate::peers::Peers;
+use crate::strategy::Strategy;
 use crate::torrent::*;
 use crate::tracker::*;
 
@@ -102,6 +103,8 @@ fn main() {
     )
     .unwrap();
 
+    let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 5); // TODO make not 5
+
     // parse that url and open the initial socket
     // this blocks because wth are you gonna do while you wait for a response
     dbg!(get_tracker_url());
@@ -158,8 +161,8 @@ fn main() {
         // timer for blasting send
         if strategy_timer.elapsed() > STRATEGY_TIMEOUT {
             // dbg!("strategy timeout occurred !!");
-            // strategy::what_do(&mut peer_list);
-            // p2p::send_all(&mut peer_list);
+            strategy_state.what_do(&mut peer_list, &mut output_file);
+            p2p::send_all(&mut peer_list).expect("failed to send all");
             strategy_timer = Instant::now();
         }
 
@@ -278,7 +281,11 @@ fn main() {
                             self_info.downloaded,
                             self_info.left,
                             self_info.tracker_event,
-                            Url::parse(get_tracker_url()).unwrap().host_str().unwrap().to_string(),
+                            Url::parse(get_tracker_url())
+                                .unwrap()
+                                .host_str()
+                                .unwrap()
+                                .to_string(),
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
 
@@ -382,7 +389,7 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
     dbg!(format!("handling peer {:?}", peer));
     p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
                                                                  // TODO: should remove peer if error reading? (question mark?)
-    // 
+                                                                 //
     let messages = peer.messages.messages.clone();
 
     for msg in messages {
@@ -455,37 +462,35 @@ fn create_peer_id() -> [u8; 20] {
     my_peer_id.into_bytes().try_into().unwrap()
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use bitvec::{vec::BitVec, order::Msb0};
+    use bitvec::{order::Msb0, vec::BitVec};
 
     #[test]
     #[ignore]
     fn test_bitfield_drain() {
         let num_pieces = 3;
         let mut correct_field = BitVec::<u8, Msb0>::new();
-        correct_field.push(true);    
-        correct_field.push(false);    
-        correct_field.push(true);    
+        correct_field.push(true);
+        correct_field.push(false);
+        correct_field.push(true);
 
         let mut field = BitVec::<u8, Msb0>::new();
         // bitvec is [1, 0, 1, 0, 0, 0, 0, 0]
-        field.push(true);    
-        field.push(false);    
-        field.push(true);    
+        field.push(true);
+        field.push(false);
+        field.push(true);
 
-        field.push(false);    
-        field.push(false);    
-        field.push(false);    
-        field.push(false);    
-        field.push(false);    
+        field.push(false);
+        field.push(false);
+        field.push(false);
+        field.push(false);
+        field.push(false);
 
         // should make bitvec [1, 0, 1]
         let _ = field.drain(field.len() - (num_pieces % 8)..);
         assert_eq!(field.len(), num_pieces);
         assert_eq!(field, correct_field);
-
     }
 }
