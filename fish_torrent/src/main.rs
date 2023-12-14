@@ -199,6 +199,10 @@ fn main() {
     };
 
     loop {
+        // check if you have downloaded the file
+        if output_file.is_file_finished() {
+            println!("🦀🦀🦀🦀 You have downloaded {} successfully!! Congrats!!! 🦀🦀🦀🦀", get_file_name());
+        }
         // should we send a keepalive?
         if timers.keepalive.timeout_huh() {
             println!(" === KeepAlive Timeout === ");
