@@ -149,9 +149,6 @@ fn show(bs: &[u8]) -> String {
     visible
 }
 
-
-
-
 pub fn get_tracker_response_from_vec_u8(buf: &Vec<u8>) -> TrackerResponse {
     //if Ok, we have received n bytes and placed into response_data.
     // then, we process.

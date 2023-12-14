@@ -111,7 +111,10 @@ impl OutputFile {
             Err(Error::msg("begin was not aligned to block_size"))
         } else {
             if block.len() > self.block_size {
-                println!("Received block size too large. Writing the first {} bytes...", self.block_size);
+                println!(
+                    "Received block size too large. Writing the first {} bytes...",
+                    self.block_size
+                );
                 block.drain(self.block_size..);
             }
 
@@ -466,7 +469,10 @@ mod test {
         for i in 0..piece_size - 1 {
             test_file.write_block(1, i, Vec::from([99 + i as u8]));
         }
-        assert_eq!(test_file.write_block(1, 9, Vec::from([b'l'])).unwrap(), true);
+        assert_eq!(
+            test_file.write_block(1, 9, Vec::from([b'l'])).unwrap(),
+            true
+        );
         assert_eq!(test_file.check_piece_finished(1).unwrap(), true);
         test_file.set_piece_finished(1).unwrap();
         assert_eq!(test_file.get_file_bitfield()[1], true);
@@ -537,24 +543,52 @@ mod test {
         let num_pieces = 2;
         let piece_size = 5;
         let block_size = 1;
-        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
+        let mut test_file = OutputFile::new(
+            filename,
+            num_pieces * piece_size,
+            num_pieces,
+            piece_size,
+            block_size,
+        )
+        .unwrap();
 
         // Assert that everything is initialized correctly.
-        assert_eq!(test_file.get_file_bitfield(), BitVec::from_bitslice(bits![u8, Msb0; 0, 0]));
-        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 0, 0, 0, 0, 0]));
+        assert_eq!(
+            test_file.get_file_bitfield(),
+            BitVec::from_bitslice(bits![u8, Msb0; 0, 0])
+        );
+        assert_eq!(
+            test_file.get_blocks()[0],
+            BitVec::from_bitslice(bits![u8, Msb0; 0, 0, 0, 0, 0])
+        );
         // This should drop a lot of bytes.
         _ = test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd', b'e']));
-        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 0, 0, 0]));
+        assert_eq!(
+            test_file.get_blocks()[0],
+            BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 0, 0, 0])
+        );
         for i in 0..piece_size {
             _ = test_file.write_block(0, i, Vec::from([b'a']));
         }
-        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 1, 1, 1, 1, 1]));
+        assert_eq!(
+            test_file.get_blocks()[0],
+            BitVec::from_bitslice(bits![u8, Msb0; 1, 1, 1, 1, 1])
+        );
         test_file.set_piece_finished(0);
-        assert_eq!(test_file.get_file_bitfield(), BitVec::from_bitslice(bits![u8, Msb0; 1, 0]));
+        assert_eq!(
+            test_file.get_file_bitfield(),
+            BitVec::from_bitslice(bits![u8, Msb0; 1, 0])
+        );
 
         test_file.clear_piece(0);
-        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 0, 0, 0, 0, 0]));
-        assert_eq!(test_file.get_file_bitfield(), BitVec::from_bitslice(bits![u8, Msb0; 0, 0]));
+        assert_eq!(
+            test_file.get_blocks()[0],
+            BitVec::from_bitslice(bits![u8, Msb0; 0, 0, 0, 0, 0])
+        );
+        assert_eq!(
+            test_file.get_file_bitfield(),
+            BitVec::from_bitslice(bits![u8, Msb0; 0, 0])
+        );
     }
 
     #[test]

@@ -35,6 +35,7 @@ use crate::tracker::*;
 
 const STRATEGY_TIMEOUT: Duration = Duration::new(0, 500000000); // 100 milliseconds TODO: change back to .1 sec
 const KEEPALIVE_TIMEOUT: Duration = Duration::new(10, 0); // 2 minutes because T H E S P E C
+const CLEAR_REQUESTS_TIMEOUT: Duration = Duration::new(30, 0); // 2 minutes because T H E S P E C
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -57,6 +58,50 @@ struct SelfInfo {
     downloaded: usize,
     left: usize,
     tracker_event: Event,
+}
+
+#[derive(PartialOrd, PartialEq)]
+struct Timer {
+    timeout: Duration,
+    instant: Instant,
+}
+
+impl Timer {
+    pub fn timeout_huh(&self) -> bool {
+        self.instant.elapsed() > self.timeout
+    }
+
+    pub fn update_instant(&mut self) -> () {
+        self.instant = Instant::now();
+    }
+}
+
+struct Timers {
+    strategy: Timer,
+    tracker: Timer,
+    keepalive: Timer,
+    clear_requests: Timer,
+    // if another timer gets added, remember to change min_remaining too
+}
+
+impl Timers {
+    pub fn min_remaining(&self) -> Duration {
+        let mut all_timers = Vec::new();
+        all_timers.push(&self.strategy);
+        all_timers.push(&self.tracker);
+        all_timers.push(&self.keepalive);
+        all_timers.push(&self.clear_requests);
+
+        let mut min_remaining: Duration = Duration::new(std::u64::MAX, 0);
+        for timer in all_timers {
+            let remaining = timer.timeout - timer.instant.elapsed();
+            if remaining < min_remaining {
+                min_remaining = remaining;
+            }
+        }
+
+        min_remaining
+    }
 }
 
 /// main handles the initialization of stuff and keeping the event loop logic going
@@ -133,31 +178,53 @@ fn main() {
         .expect("tracker register failed");
 
     // Set up the initial timers.
-    let mut keepalive_timer = Instant::now();
-    let mut strategy_timer = Instant::now();
-    let mut tracker_timer = Instant::now();
-    let mut tracker_timeout: Duration = Duration::new(std::u64::MAX, 0);
+    // this struct just holds all the timers which we are keeping track of
+    let mut timers = Timers {
+        strategy: Timer {
+            timeout: STRATEGY_TIMEOUT,
+            instant: Instant::now(),
+        },
+        tracker: Timer {
+            timeout: Duration::new(std::u64::MAX, 0),
+            instant: Instant::now(),
+        },
+        keepalive: Timer {
+            timeout: KEEPALIVE_TIMEOUT,
+            instant: Instant::now(),
+        },
+        clear_requests: Timer {
+            timeout: CLEAR_REQUESTS_TIMEOUT,
+            instant: Instant::now(),
+        },
+    };
 
     loop {
         // should we send a keepalive?
-        if keepalive_timer.elapsed() > KEEPALIVE_TIMEOUT {
+        if timers.keepalive.timeout_huh() {
             println!(" === KeepAlive Timeout === ");
             strategy_state.push_update(None, MessageType::KeepAlive);
-            keepalive_timer = Instant::now();
+            timers.keepalive.update_instant();
+        }
+
+        // should we ask our peers that we've already requested again?
+        if timers.clear_requests.timeout_huh() {
+            println!(" === Clear Requests Timeout === ");
+            strategy_state.rm_all_requests();
+            timers.clear_requests.update_instant();
         }
 
         // Strategy timeout.
-        if strategy_timer.elapsed() > STRATEGY_TIMEOUT {
+        if timers.strategy.timeout_huh() {
             println!(" === Strategy Timeout === ");
 
             strategy_state.what_do(&mut peer_list, &mut output_file);
             p2p::send_all(&mut peer_list).expect("failed to send all");
 
-            strategy_timer = Instant::now();
+            timers.strategy.update_instant();
         }
 
         // Tracker request timeout.
-        if tracker_timer.elapsed() > tracker_timeout {
+        if timers.tracker.timeout_huh() {
             println!(" === Tracker Timeout === ");
 
             // Create a new HTTP connection to the tracker.
@@ -177,13 +244,12 @@ fn main() {
                 .expect("tracker register failed");
 
             // Reset tracker timer.
-            tracker_timer = Instant::now();
+            timers.tracker.update_instant();
         }
+
         println!(" === Polling... === ");
         // Calculate time remaining for each of the timers.
-        let strategy_remaining = STRATEGY_TIMEOUT - strategy_timer.elapsed();
-        let tracker_remaining = tracker_timeout - tracker_timer.elapsed();
-        poll.poll(&mut events, Some(strategy_remaining.min(tracker_remaining)))
+        poll.poll(&mut events, Some(timers.min_remaining()))
             .expect("poll_wait failed");
 
         // For every event...
@@ -232,8 +298,7 @@ fn main() {
                         if let Some(tracker_response) = response {
                             println!("- Tracker response parsed {:?} -", &tracker_response);
                             // Reset the tracker timer based on the interval received from tracker.
-                            tracker_timeout =
-                                Duration::new(tracker_response.interval.try_into().unwrap(), 0);
+                            timers.tracker.timeout = Duration::new(tracker_response.interval.try_into().unwrap(), 0);
 
                             // Add all peers received from tracker to peer_list and register them
                             // with the poll instance.
@@ -317,10 +382,17 @@ fn main() {
                         else {
                             if event.is_readable() {
                                 println!("- Received handshake from peer {:?} -", &peer_addr);
-                                let peer_id = p2p::recv_handshake(peer.get_mut_socket()).unwrap();
-                                peer_list
-                                    .complete_peer(peer_addr, &peer_id.try_into().unwrap())
-                                    .unwrap();
+                                if let Ok(peer_id) = p2p::recv_handshake(peer.get_mut_socket()) {
+                                    peer_list
+                                        .complete_peer(peer_addr, &peer_id.try_into().unwrap())
+                                        .unwrap();
+                                }
+                                // i am offended you sent a bad handshake
+                                else {
+                                    println!("Bad handshake received, bye bye loser!");
+                                    let peer = peer_list.remove_peer(peer_addr).unwrap();
+                                    peer.disconnect().expect("failed to disconnect peer");
+                                }
                             } else if event.is_writable() {
                                 println!("- Sent handshake to peer {:?} -", &peer_addr);
                                 p2p::send_handshake(peer, &self_info.peer_id, &output_file)
@@ -378,7 +450,12 @@ fn get_new_token() -> Token {
 }
 
 /// Handles the message received from a peer.
-fn handle_peer(peer_addr: SocketAddr, peer: &mut Peer, output_file: &mut OutputFile, strategy_state: &mut Strategy) {
+fn handle_peer(
+    peer_addr: SocketAddr,
+    peer: &mut Peer,
+    output_file: &mut OutputFile,
+    strategy_state: &mut Strategy,
+) {
     p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
                                                                  // TODO: should remove peer if error reading? (question mark?)
                                                                  //
@@ -429,20 +506,29 @@ fn handle_peer(peer_addr: SocketAddr, peer: &mut Peer, output_file: &mut OutputF
                     begin.try_into().unwrap(),
                     block,
                 ) {
-                    dbg!(format!("We have written all the blocks to piece {} (but hash ?)", index));
+                    dbg!(format!(
+                        "We have written all the blocks to piece {} (but hash ?)",
+                        index
+                    ));
                     // does the piece match with our hash
                     if let Ok(true) = output_file.compare_piece_hash(
                         index.try_into().unwrap(),
-                        &get_piece_hash(index.try_into().unwrap()).expect("failed to get piece hash"),
+                        &get_piece_hash(index.try_into().unwrap())
+                            .expect("failed to get piece hash"),
                     ) {
                         dbg!(format!("Hash for piece {} matches!!!", index));
-                        output_file.set_piece_finished(index.try_into().unwrap()).expect("failed to set piece to finished");
+                        output_file
+                            .set_piece_finished(index.try_into().unwrap())
+                            .expect("failed to set piece to finished");
                         strategy_state.rm_requests_for_piece(index.try_into().unwrap());
                         // if so, we can push the update that we have completed a piece !!
-                        strategy_state.push_update(Some(peer_addr), MessageType::Have { index: index });
+                        strategy_state
+                            .push_update(Some(peer_addr), MessageType::Have { index: index });
                     } else {
                         // otherwise, something went wrong when downloading the piece so lets try again :)
-                        output_file.clear_piece(index.try_into().unwrap()).expect("failed to clear piece");
+                        output_file
+                            .clear_piece(index.try_into().unwrap())
+                            .expect("failed to clear piece");
                         strategy_state.rm_requests_for_piece(index.try_into().unwrap());
                     }
                 }

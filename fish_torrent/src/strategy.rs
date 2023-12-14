@@ -52,7 +52,10 @@ impl Strategy {
     }
 
     pub fn push_update(&mut self, peer_addr: Option<SocketAddr>, message: MessageType) {
-        self.updates.push(Update { peer_addr: peer_addr, message: message });
+        self.updates.push(Update {
+            peer_addr: peer_addr,
+            message: message,
+        });
     }
 
     // gets rid of all the requests in the list associated with some block
@@ -72,6 +75,10 @@ impl Strategy {
         for idx in to_remove {
             self.rqs.remove(idx);
         }
+    }
+
+    pub fn rm_all_requests(&mut self) {
+        self.rqs.clear();
     }
 
     pub fn what_do(&mut self, peers: &mut Peers, file: &OutputFile) {
