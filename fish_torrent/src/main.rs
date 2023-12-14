@@ -15,6 +15,7 @@ mod strategy;
 mod torrent;
 mod tracker;
 
+use anyhow::Error;
 use clap::Parser;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
@@ -367,14 +368,7 @@ fn main() {
                         println!("- Peer socket error or connection closed. Dropping peer... -");
                         // let mut buf = String::new();
                         // std::io::stdin().read_line(&mut buf);
-                        let peer_addr = sockets.remove(&token).unwrap();
-                        let peer = peer_list.remove_peer(peer_addr).unwrap();
-                        // you cant shutdown a non connected socket (as we have figured out very quickly)
-                        if !event.is_error() {
-                            if let Ok(_) = peer.disconnect() {
-                                println!("Successfully disconnected peer!");
-                            }
-                        }
+                        disconnect_peer(&mut poll, &mut peer_list, &mut sockets, token);
                         continue;
                     }
 
@@ -384,7 +378,11 @@ fn main() {
                         let peer = peer_list.find_peer(peer_addr).unwrap();
                         if peer.is_complete() {
                             println!("- Handling peer {:?} -", &peer_addr);
-                            handle_peer(peer_addr, peer, &mut output_file, &mut strategy_state);
+                            if let Err(e) = handle_peer(peer_addr, peer, &mut output_file, &mut strategy_state) {
+                                dbg!(e);
+                                println!("Disconnecting peer!");
+                                disconnect_peer(&mut poll, &mut peer_list, &mut sockets, token);
+                            }
                         }
                         // no we havent
                         else {
@@ -398,8 +396,7 @@ fn main() {
                                 // i am offended you sent a bad handshake
                                 else {
                                     println!("Bad handshake received, bye bye loser!");
-                                    let peer = peer_list.remove_peer(peer_addr).unwrap();
-                                    peer.disconnect().expect("failed to disconnect peer");
+                                    disconnect_peer(&mut poll, &mut peer_list, &mut sockets, token);
                                 }
                             } else if event.is_writable() {
                                 println!("- Sent handshake to peer {:?} -", &peer_addr);
@@ -416,6 +413,29 @@ fn main() {
                     }
                 }
             }
+        }
+    }
+}
+
+fn disconnect_peer(poll: &mut Poll, peer_list: &mut Peers, sockets: &mut HashMap<Token, SocketAddr>, token: Token) {
+    let peer_addr = sockets.remove(&token).unwrap();
+    let mut peer = peer_list.remove_peer(peer_addr).unwrap();
+    dbg!(&peer);
+    match poll.registry().deregister(peer.get_mut_socket()) {
+        Ok(_) => {
+            println!("Successfully removed peer from poll!");
+        }
+        Err(e) => {
+            dbg!(e);
+        }
+    }
+
+    match peer.disconnect() {
+        Ok(_) => {
+            println!("Successfully disconnected peer!");
+        }
+        Err(e) => { 
+            dbg!(e);
         }
     }
 }
@@ -463,10 +483,9 @@ fn handle_peer(
     peer: &mut Peer,
     output_file: &mut OutputFile,
     strategy_state: &mut Strategy,
-) {
-    p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
-                                                                 // TODO: should remove peer if error reading? (question mark?)
-                                                                 //
+) -> Result<(), Error>{
+    p2p::handle_messages(peer)?; 
+
     let messages = peer.messages.messages.clone();
 
     for msg in messages {
@@ -541,7 +560,6 @@ fn handle_peer(
                         strategy_state.rm_requests_for_piece(index.try_into().unwrap());
                     }
                 }
-                dbg!(output_file.get_file_bitfield());
             }
             MessageType::Cancel {
                 index,
@@ -564,6 +582,7 @@ fn handle_peer(
     }
 
     peer.messages.messages.clear();
+    Ok(())
 }
 
 fn create_peer_id() -> [u8; 20] {
