@@ -406,9 +406,9 @@ pub fn send_handshake(peer: &mut Peer, my_id: &[u8; 20], file: &OutputFile) -> R
 
     // dbg!(format!("send handshake bitfield {}", file.get_file_bitfield()));
     //TODO GET THE BITFIELD
-    peer.messages.messages.push(MessageType::Bitfield {
-        field: file.get_file_bitfield(),
-    });
+    // peer.messages.messages.push(MessageType::Bitfield {
+    //     field: file.get_file_bitfield(),
+    // });
 
     Ok(())
 }

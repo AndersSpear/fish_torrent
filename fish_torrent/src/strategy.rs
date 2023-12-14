@@ -100,8 +100,8 @@ impl Strategy {
                         .push(MessageType::KeepAlive);
                 }
             }
-
         }
+        self.updates.clear();
 
         // Choose pieces to focus on.
         // THIS CODE IS LIKE O(N2) IM SORRY OK 😭

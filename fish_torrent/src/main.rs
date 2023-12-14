@@ -34,7 +34,7 @@ use crate::torrent::*;
 use crate::tracker::*;
 
 const STRATEGY_TIMEOUT: Duration = Duration::new(0, 500000000); // 100 milliseconds TODO: change back to .1 sec
-const KEEPALIVE_TIMEOUT: Duration = Duration::new(120, 0); // 2 minutes because T H E S P E C
+const KEEPALIVE_TIMEOUT: Duration = Duration::new(10, 0); // 2 minutes because T H E S P E C
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
