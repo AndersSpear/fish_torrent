@@ -207,7 +207,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     }
                 }
                 5 => {
-                    let field = BitVec::from_vec(buf[5..].to_vec());
+                    let field = BitVec::from_vec(buf[5..(n as usize + 4)].to_vec());
                     buf.drain(0..5);
                     buf.drain(0..(n as usize - 1));
                     MessageType::Bitfield { field }
@@ -597,7 +597,10 @@ mod test {
 
             handle_messages(&mut reciever).unwrap();
             let recieved_messages = reciever.get_messages_clone();
-            assert_eq!(recieved_messages.messages[0], bitfield);
+
+            let field:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1,1,1,0,0,0,0,0,0,0]);
+
+            assert_eq!(recieved_messages.messages[0], MessageType::Bitfield { field });
         }
     }
 
@@ -860,6 +863,10 @@ mod test {
             let have = MessageType::Have { index: 23 };
 
             let bv:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1,1,1]);
+            let recvbv:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1,1,1,0,0,0,0,0,0,0]);
+            let recvbitfield = MessageType::Bitfield {
+                field:recvbv
+            };
             let bitfield = MessageType::Bitfield {
                 field: bv,
             };
@@ -909,7 +916,7 @@ mod test {
             assert_eq!(recieved_messages.messages[2], interested);
             assert_eq!(recieved_messages.messages[3], not_interested);
             assert_eq!(recieved_messages.messages[4], have);
-            assert_eq!(recieved_messages.messages[5], bitfield);
+            assert_eq!(recieved_messages.messages[5], recvbitfield);
             assert_eq!(recieved_messages.messages[6], request);
             assert_eq!(recieved_messages.messages[7], piece);
             assert_eq!(recieved_messages.messages[8], cancel);
