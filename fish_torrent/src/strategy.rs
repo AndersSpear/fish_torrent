@@ -144,7 +144,7 @@ impl Strategy {
                     else if !peer.peer_choking {
                         // TODO: send more than one block at once?
                         let mut i = 0;
-                        while i < file.get_piece_size()
+                        while i < file.get_piece_size(piece)
                             && (file.is_block_finished(piece, i).unwrap()
                                 || self.rqs.contains(&Request {
                                     peer_addr: *addr,
@@ -158,17 +158,12 @@ impl Strategy {
 
                         // If i is greater than piece size, then there is nothing else
                         // to request from this peer. Otherwise, add a request.
-                        if i < file.get_piece_size() {
+                        if i < file.get_piece_size(piece) {
                             // should send the next block we want to request for that piece
                             let mut block_len: u32 = BLOCK_SIZE.try_into().unwrap();
-                            if file.get_piece_size() - i < BLOCK_SIZE {
+                            if file.get_piece_size(piece) - i < BLOCK_SIZE {
                                 dbg!("we are here");
-                                block_len = (file.get_piece_size() % BLOCK_SIZE) as u32;
-                            }
-
-                            if piece == 1 && i == BLOCK_SIZE {
-                                dbg!(block_len);
-                                continue;
+                                block_len = (file.get_piece_size(piece) % BLOCK_SIZE) as u32;
                             }
 
                             peer.get_mut_messages().messages.push(MessageType::Request {
