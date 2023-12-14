@@ -361,6 +361,8 @@ fn main() {
                     // something went wrong so uh idc about you anymore
                     if event.is_error() || event.is_read_closed() {
                         println!("- Peer socket error or connection closed. Dropping peer... -");
+                        // let mut buf = String::new();
+                        // std::io::stdin().read_line(&mut buf);
                         let peer_addr = sockets.remove(&token).unwrap();
                         let peer = peer_list.remove_peer(peer_addr).unwrap();
                         // you cant shutdown a non connected socket (as we have figured out very quickly)

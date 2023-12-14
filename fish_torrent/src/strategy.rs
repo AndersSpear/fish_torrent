@@ -163,7 +163,12 @@ impl Strategy {
                             // should send the next block we want to request for that piece
                             let mut block_len: u32 = BLOCK_SIZE.try_into().unwrap();
                             if file.get_piece_size() - i < BLOCK_SIZE {
+                                dbg!("we are here");
                                 block_len = (file.get_piece_size() % BLOCK_SIZE) as u32;
+                            }
+
+                            if piece == 1 && i == BLOCK_SIZE {
+                                continue;
                             }
 
                             peer.get_mut_messages().messages.push(MessageType::Request {
