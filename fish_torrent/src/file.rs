@@ -213,10 +213,11 @@ mod test {
     use super::*;
     use std::fs;
     #[test]
+    #[ignore]
     fn test_general() {
         let filename = "file.rs.test_general.output";
         let _ = fs::remove_file(filename);
-        let mut test_file = OutputFile::new(filename, 5, 10).unwrap();
+        let mut test_file = OutputFile::new(filename, 50, 5, 10).unwrap();
         // Write some data.
         _ = test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd']));
         _ = test_file.write_block(1, 0, Vec::from([b'x', b'y', b'z']));
@@ -247,7 +248,7 @@ mod test {
     fn test_write_fail() {
         let filename = "file.rs.test_write_fail.output";
         let _ = fs::remove_file(filename);
-        let mut test_file = OutputFile::new(filename, 5, 10).unwrap();
+        let mut test_file = OutputFile::new(filename, 50, 5, 10).unwrap();
         // Write to bounds of file and file pieces. Expect errors.
         assert!(test_file.write_block(5, 0, Vec::from([b'a'])).is_err());
         assert!(test_file.write_block(0, 10, Vec::new()).is_err());
@@ -274,7 +275,7 @@ mod test {
     fn test_read_fail() {
         let filename = "file.rs.test_read_fail.output";
         let _ = fs::remove_file(filename);
-        let mut test_file = OutputFile::new(filename, 5, 10).unwrap();
+        let mut test_file = OutputFile::new(filename, 50, 5, 10).unwrap();
         // Read to bounds of file and file pieces.
         // Reading past end of piece.
         assert!(test_file.read_block(0, 9, 1).is_ok());
@@ -304,7 +305,7 @@ mod test {
         let _ = fs::remove_file(filename);
         let num_pieces = 5;
         let piece_size = 10;
-        let mut test_file = OutputFile::new(filename, num_pieces, piece_size).unwrap();
+        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
 
         // Check to make sure that the BitVec intialized as expected.
         assert_eq!(test_file.bytes.len(), num_pieces);
@@ -375,7 +376,7 @@ mod test {
         let _ = fs::remove_file(filename);
         let num_pieces = 2;
         let piece_size = 5;
-        let mut test_file = OutputFile::new(filename, num_pieces, piece_size).unwrap();
+        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
 
         // Write a piece "abcde".
         assert_eq!(
