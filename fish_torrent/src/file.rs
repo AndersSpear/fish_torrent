@@ -32,7 +32,13 @@ impl OutputFile {
     /// The latter two arguments will be checked on any given read
     /// or write call.
     /// Returns None if the file was not able to be created for any reason.
-    pub fn new(name: &str, length: usize, num_pieces: usize, piece_size: usize, block_size: usize) -> Option<Self> {
+    pub fn new(
+        name: &str,
+        length: usize,
+        num_pieces: usize,
+        piece_size: usize,
+        block_size: usize,
+    ) -> Option<Self> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -153,7 +159,9 @@ impl OutputFile {
 
     pub fn clear_piece(&mut self, index: usize) -> Result<()> {
         if index >= self.num_pieces {
-            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+            return Err(Error::msg(
+                "Index greater than or equal to the number of pieces!",
+            ));
         }
 
         for i in 0..self.blocks[index].len() {
@@ -166,7 +174,9 @@ impl OutputFile {
 
     pub fn set_piece_finished(&mut self, index: usize) -> Result<()> {
         if index >= self.num_pieces {
-            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+            return Err(Error::msg(
+                "Index greater than or equal to the number of pieces!",
+            ));
         }
 
         self.pieces.set(index, true);
@@ -177,7 +187,9 @@ impl OutputFile {
     /// and the 20-byte hash argument.
     pub fn compare_piece_hash(&self, index: usize, hash: &[u8; 20]) -> Result<bool> {
         if index >= self.num_pieces {
-            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+            return Err(Error::msg(
+                "Index greater than or equal to the number of pieces!",
+            ));
         }
 
         Ok(self.hash_piece(index)? == *hash)
@@ -187,7 +199,9 @@ impl OutputFile {
     /// from the file and return that pieces SHA1 hash.
     fn hash_piece(&self, index: usize) -> Result<[u8; 20]> {
         if index >= self.num_pieces {
-            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+            return Err(Error::msg(
+                "Index greater than or equal to the number of pieces!",
+            ));
         }
 
         let mut hash: [u8; 20] = [0; 20];
@@ -225,7 +239,9 @@ impl OutputFile {
     /// Check to see if the piece was finished.
     fn is_piece_finished(&self, index: usize) -> Result<bool> {
         if index >= self.num_pieces {
-            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+            return Err(Error::msg(
+                "Index greater than or equal to the number of pieces!",
+            ));
         }
 
         let bound = if index == self.num_pieces - 1 {
@@ -353,7 +369,14 @@ mod test {
         let num_pieces = 5;
         let piece_size = 10;
         let block_size = 1;
-        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
+        let mut test_file = OutputFile::new(
+            filename,
+            num_pieces * piece_size,
+            num_pieces,
+            piece_size,
+            block_size,
+        )
+        .unwrap();
 
         // Check to make sure that the BitVec intialized as expected.
         assert_eq!(test_file.bytes.len(), num_pieces);
@@ -425,7 +448,14 @@ mod test {
         let num_pieces = 2;
         let piece_size = 5;
         let block_size = 1;
-        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
+        let mut test_file = OutputFile::new(
+            filename,
+            num_pieces * piece_size,
+            num_pieces,
+            piece_size,
+            block_size,
+        )
+        .unwrap();
 
         // Write a piece "abcde".
         assert_eq!(
@@ -477,9 +507,17 @@ mod test {
         let num_pieces = 2;
         let piece_size = 5;
         let block_size = 1;
-        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
-        
-        let bv:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1, 1, 1]);
+        let mut test_file = OutputFile::new(
+            filename,
+            num_pieces * piece_size,
+            num_pieces,
+            piece_size,
+            block_size,
+        )
+        .unwrap();
+
+        let bv: BitVec<u8, Msb0> =
+            BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1, 1, 1]);
     }
 
     #[test]

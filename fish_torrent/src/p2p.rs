@@ -132,6 +132,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
     loop {
         match parse_message(&mut buf) {
             Some(msg) => {
+                dbg!(&msg);
                 return_msgs.messages.push(msg);
             }
             None => {
@@ -148,6 +149,8 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
 // TODO make sure this handles handshakes smile
 /// tries to parse one message from the buffer
 fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
+    dbg!(&buf);
+
     if buf.len() < 4 {
         //dbg!("less than 4 bytes in buffer");
         println!("Partial read from peer occurred");
@@ -220,7 +223,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     let index = BigEndian::read_u32(&buf[5..9]);
                     let begin = BigEndian::read_u32(&buf[9..13]);
                     let length = BigEndian::read_u32(&buf[13..17]);
-                    buf.drain(0..17);
+                    buf.drain(0..18);
 
                     MessageType::Request {
                         index,
@@ -234,7 +237,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     };
                     let index = BigEndian::read_u32(&buf[5..9]);
                     let begin = BigEndian::read_u32(&buf[9..13]);
-                    let block = buf[13..].to_vec();
+                    let block = buf[13..(n as usize + 4)].to_vec();
                     buf.drain(0..13);
                     buf.drain(0..block.len());
                     MessageType::Piece {
@@ -251,7 +254,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     let index = BigEndian::read_u32(&buf[5..9]);
                     let begin = BigEndian::read_u32(&buf[9..13]);
                     let length = BigEndian::read_u32(&buf[13..17]);
-                    buf.drain(0..17);
+                    buf.drain(0..18);
 
                     MessageType::Cancel {
                         index,
