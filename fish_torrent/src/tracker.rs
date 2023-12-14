@@ -249,6 +249,7 @@ mod tests {
             0,
             0,
             Event::STARTED,
+            String::from("poole.cs.umd.edu"),
         );
         let request = TrackerRequest::construct_tracker_request(&tr);
 
@@ -266,6 +267,7 @@ mod tests {
             0,
             0,
             Event::STARTED,
+            String::from("poole.cs.umd.edu"),
         );
 
         // this should only fail if the UMD server is down.
@@ -291,6 +293,7 @@ mod tests {
             0,
             0,
             Event::STARTED,
+            String::from("poole.cs.umd.edu"),
         );
 
         let mut tracker_sock = TcpStream::from_std(
