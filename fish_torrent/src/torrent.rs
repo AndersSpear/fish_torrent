@@ -195,8 +195,20 @@ mod test {
     rusty_fork_test! {
         #[test]
         fn test_get_piece_hash(){
-            //TODO write this
-            assert_eq!(1,0);
+
+            super::parse_torrent_file("../artofwar.torrent");
+            assert_eq!(super::get_piece_hash(0).expect("mlem").to_vec(), hex::decode("148C74D24BC89E9C7BC1EA97B354AA0DFAD7041B").unwrap());
+            assert_eq!(super::get_piece_hash(1).expect("meow").to_vec(), hex::decode("A7C239739231CC40A30879640C7C390BBEE8BFF8").unwrap());
+
+        }
+    }
+    rusty_fork_test! {
+        #[test]
+        fn test_get_piece_hash_debian(){
+
+            super::parse_torrent_file("../taytay.torrent");
+            assert_eq!(super::get_piece_hash(0).expect("mlem").to_vec(), hex::decode("460A5F6DE49C2A46DB7D1603DA80F4A8D3206C5F").unwrap());
+            assert_eq!(super::get_piece_hash(129).expect("meow").to_vec(), hex::decode("D8B8CD5B502261007E0E277FE564A474AB665464").unwrap());
 
         }
     }

@@ -237,6 +237,7 @@ pub fn bytes_to_urlencoding(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use url::Url;
     #[test]
     fn test_construct_tracker_request() {
         let tr = TrackerRequest::new(
