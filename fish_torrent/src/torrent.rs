@@ -7,6 +7,7 @@
 
 use bendy::decoding::{Decoder, Object};
 use bendy::serde::from_bytes;
+use bitvec::index;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::fs::read;
@@ -142,6 +143,10 @@ pub fn get_number_of_pieces() -> u32 {
 /// each hash is a vector of 20 bytes
 pub fn get_pieces() -> &'static Vec<u8> {
     &TORRENT.get().unwrap().info.pieces
+}
+
+pub fn get_piece_hash(index:usize) -> [u8;20]{
+    [0_u8;20]
 }
 
 /// file length in bytes
