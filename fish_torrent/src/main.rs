@@ -509,7 +509,7 @@ fn handle_peer(
                     block,
                 ) {
                     dbg!(format!(
-                        "We have written all the blocks to piece {} (but hash ?)",
+                        "Piece {} is complete, but not hashed.",
                         index
                     ));
                     // does the piece match with our hash

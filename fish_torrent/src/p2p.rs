@@ -161,7 +161,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
     //this could break if buf[0..4] gets corrupted and is big
     if buf.len() < len as usize + 4 {
         //dbg!("not enough bytes in buffer");
-        println!("Partial read from peer occurred");
+        println!("Partial read from peer occurred - expected {} bytes", len);
         return None;
     }
 
