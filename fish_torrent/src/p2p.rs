@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![warn(missing_docs)]
 //! this is responsible for low level p2p communication
 //! send messages to peers, recieve messages from peers, does not handle the logic of what to do with the messages.
@@ -84,9 +83,13 @@ impl Messages {
         // 4 bytes        1 byte      ? bytes
 
         // TODO catch if it would block
+
+        let mut sendbuf:Vec<u8> = vec![];
+
         for msg in self.messages {
-            msg.send(sock)?;
+            msg.send(&mut sendbuf)?;
         }
+        sock.write_all(&sendbuf)?;
         Ok(())
     }
 }
@@ -242,63 +245,64 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
 }
 
 impl MessageType {
-    fn send(self, sock: &mut TcpStream) -> Result<(), Error> {
+    fn send(self, buf: &mut Vec<u8>) -> Result<(), Error> {
         match self {
             MessageType::Choke => {
-                send_len_id(sock, 1, 0)?;
+                send_len_id(buf, 1, 0)?;
             }
             MessageType::Unchoke => {
-                send_len_id(sock, 1, 1)?;
+                send_len_id(buf, 1, 1)?;
             }
             MessageType::Interested => {
-                send_len_id(sock, 1, 2)?;
+                send_len_id(buf, 1, 2)?;
             }
             MessageType::NotInterested => {
-                send_len_id(sock, 1, 3)?;
+                send_len_id(buf, 1, 3)?;
             }
             MessageType::Have { index } => {
-                send_have(sock, index)?;
+                send_have(buf, index)?;
             }
             MessageType::Bitfield { field } => {
-                send_bitfield(sock, field)?;
+                send_bitfield(buf, field)?;
             }
             MessageType::Request {
                 index,
                 begin,
                 length,
             } => {
-                send_request_or_cancel(sock, true, index, begin, length)?;
+                send_request_or_cancel(buf, true, index, begin, length)?;
             }
             MessageType::Piece {
                 index,
                 begin,
                 block,
             } => {
-                send_piece(sock, index, begin, block)?;
+                send_piece(buf, index, begin, block)?;
             }
             MessageType::Cancel {
                 index,
                 begin,
                 length,
             } => {
-                send_request_or_cancel(sock, false, index, begin, length)?;
+                send_request_or_cancel(buf, false, index, begin, length)?;
             }
             MessageType::KeepAlive => {
-                sock.write_all(&[0; 4])?;
+                let b:[u8;4] = [0; 4];
+                buf.write_all(&b)?;
             }
         }
         Ok(())
     }
 }
-fn send_len_id(sock: &mut TcpStream, len: u32, id: u8) -> Result<(), Error> {
+fn send_len_id(sendbuf: &mut Vec<u8>, len: u32, id: u8) -> Result<(), Error> {
     let mut buf = vec![0; 5];
     buf[0..4].copy_from_slice(&len.to_be_bytes());
     buf[4] = id;
-    sock.write_all(&buf)?;
+    sendbuf.append(&mut buf);
     Ok(())
 }
 
-fn send_have(sock: &mut TcpStream, index: u32) -> Result<(), Error> {
+fn send_have(sock: &mut Vec<u8>, index: u32) -> Result<(), Error> {
     let mut buf = vec![0; 9];
     buf[0..4].copy_from_slice(&5_u32.to_be_bytes());
     buf[4] = 4; // message id 4 is have
@@ -307,7 +311,7 @@ fn send_have(sock: &mut TcpStream, index: u32) -> Result<(), Error> {
     Ok(())
 }
 
-fn send_bitfield(sock: &mut TcpStream, mut field: BitVec<u8, Msb0>) -> Result<(), Error> {
+fn send_bitfield(sock: &mut Vec<u8>, mut field: BitVec<u8, Msb0>) -> Result<(), Error> {
     //bitvec manipulation
     field.force_align();
     field.set_uninitialized(false);
@@ -330,7 +334,7 @@ fn send_bitfield(sock: &mut TcpStream, mut field: BitVec<u8, Msb0>) -> Result<()
 
 /// if second argument is true, send a request, else send a cancel
 fn send_request_or_cancel(
-    sock: &mut TcpStream,
+    sock: &mut Vec<u8>,
     is_request_message: bool,
     index: u32,
     begin: u32,
@@ -346,7 +350,7 @@ fn send_request_or_cancel(
     Ok(())
 }
 
-fn send_piece(sock: &mut TcpStream, index: u32, begin: u32, block: Vec<u8>) -> Result<(), Error> {
+fn send_piece(sock: &mut Vec<u8>, index: u32, begin: u32, block: Vec<u8>) -> Result<(), Error> {
     let length = block.len() as u32;
 
     let mut buf = vec![0; 13];
@@ -423,23 +427,6 @@ mod test {
         .unwrap();
         let (other_sock, _) = serv_sock.accept().unwrap();
         (self_sock, other_sock)
-    }
-
-    #[test]
-    fn fuck_you() {
-        let (mut self_sock, mut other_sock) = networking_setup(1090);
-        dbg!(other_sock.write(b"hello").unwrap());
-        let mut buf = Vec::new();
-        match self_sock.read_to_end(&mut buf) {
-            Ok(_) => dbg!("sweet"),
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::WouldBlock {
-                    dbg!("dude")
-                } else {
-                    dbg!("fuck")
-                }
-            }
-        };
     }
 
     rusty_fork_test! {
