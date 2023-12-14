@@ -62,7 +62,7 @@ fn main() {
     // you'll never guess what this line does
     let args = Args::parse();
 
-    // things i own :)
+    // Initialize structs and data.
     let mut self_info = SelfInfo {
         tracker_id: [0; 20],
         peer_id: create_peer_id(),
@@ -75,26 +75,27 @@ fn main() {
     let mut peer_list = Peers::new();
     let mut sockets: HashMap<Token, SocketAddr> = HashMap::new();
 
-    // binds to INADDR_ANY
+    // Create a server listening socket that is bound to INADDRANY.
     let mut serv_sock = TcpListener::bind(net::SocketAddr::V4(SocketAddrV4::new(
         Ipv4Addr::UNSPECIFIED,
         args.port,
     )))
     .expect("bind failed");
-    const SERVER: Token = Token(0);
+    const SERVER: Token = Token(0); // Poll token associated with listening socket.
 
-    // creates the events and poll instance used by the event loop
+    // Creates the events and poll instance used by the event loop.
     let mut events = Events::with_capacity(727);
     let mut poll = Poll::new().expect("poll failed");
 
-    // registers our listening socket in the epoll
+    // Register listening socket in poll instance.
     poll.registry()
         .register(&mut serv_sock, SERVER, Interest::READABLE)
         .expect("serv register failed");
 
-    // read in torrent file:W
+    // Read in torrent file.
     parse_torrent_file(&args.file);
 
+    // Initialize output file using info from torrent file.
     let mut output_file = OutputFile::new(
         get_file_name(),
         get_file_length().try_into().unwrap(),
@@ -103,22 +104,15 @@ fn main() {
     )
     .unwrap();
 
+    // Initialize strategy state.
     let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 5); // TODO make not 5
 
-    // parse that url and open the initial socket
-    // this blocks because wth are you gonna do while you wait for a response
+    // Holds the partially read data from a tracker response.
+    let mut partial_tracker_data = Vec::new();
+
+    // Parse URL from tracker and open the initial socket.
+    // NOTE: Like other sockets, this is non-blocking.
     dbg!(get_tracker_url());
-    // let mut tracker_sock = TcpStream::from_std(
-    //     std::net::TcpStream::connect(
-    //         *Url::parse(get_tracker_url())
-    //             .unwrap()
-    //             .socket_addrs(|| None)
-    //             .unwrap()
-    //             .first()
-    //             .unwrap(),
-    //     )
-    //     .expect("connect failed"),
-    // );
     let mut tracker_sock = TcpStream::connect(
         *Url::parse(get_tracker_url())
             .unwrap()
@@ -128,49 +122,32 @@ fn main() {
             .unwrap(),
     )
     .expect("connect failed");
-    const TRACKER: Token = Token(1);
-    dbg!(&tracker_sock);
+    const TRACKER: Token = Token(1); // Poll token associated with tracker socket.
 
-    // let mut tracker_sock2 = TcpStream::from_std(
-    //     std::net::TcpStream::connect("128.8.126.63:6969").expect("connect failed"),
-    // );
-
-    // println!(
-    //     "addr {:?}\nuh: {:?}",
-    //     tracker_sock2.peer_addr(),
-    //     Url::parse("http://128.8.126.63:6969/announce")
-    //         .unwrap()
-    //         .socket_addrs(|| None)
-    //         .unwrap()
-    //         .first()
-    //         .unwrap()
-    // );
+    // Register tracker socket in poll instance.
     poll.registry()
         .register(&mut tracker_sock, TRACKER, Interest::WRITABLE)
         .expect("tracker register failed");
 
-    // set up the initial timers
+    // Set up the initial timers.
     let mut strategy_timer = Instant::now();
     let mut tracker_timer = Instant::now();
     let mut tracker_timeout: Duration = Duration::new(std::u64::MAX, 0);
 
-    // holds the partially read data from a tracker response
-    let mut partial_tracker_data = Vec::new();
-
     loop {
-        // timer for blasting send
+        // Strategy timeout.
         if strategy_timer.elapsed() > STRATEGY_TIMEOUT {
-            dbg!("strategy timeout occurred !!");
+            println!(" === Strategy Timeout === ");
             strategy_state.what_do(&mut peer_list, &mut output_file);
             p2p::send_all(&mut peer_list).expect("failed to send all");
             strategy_timer = Instant::now();
         }
 
-        // timer for blasting tracker
+        // Tracker request timeout.
         if tracker_timer.elapsed() > tracker_timeout {
-            dbg!("tracker timeout occurred !!");
+            println!(" === Tracker Timeout === ");
 
-            // we simply reconnect to the tracker
+            // Create a new HTTP connection to the tracker.
             tracker_sock = TcpStream::connect(
                 *Url::parse(get_tracker_url())
                     .unwrap()
@@ -180,34 +157,36 @@ fn main() {
                     .unwrap(),
             )
             .expect("connect failed");
-            dbg!(&tracker_sock);
 
-            // registers our tracker socket in the epoll
+            // Registers writing to tracker socket in poll instance.
             poll.registry()
                 .register(&mut tracker_sock, TRACKER, Interest::WRITABLE)
                 .expect("tracker register failed");
+
+            // Reset tracker timer.
             tracker_timer = Instant::now();
         }
-        dbg!("about to poll");
-        // calculate how much time is remaining for each of the timers
+        println!(" === Polling... === ");
+        // Calculate time remaining for each of the timers.
         let strategy_remaining = STRATEGY_TIMEOUT - strategy_timer.elapsed();
         let tracker_remaining = tracker_timeout - tracker_timer.elapsed();
         poll.poll(&mut events, Some(strategy_remaining.min(tracker_remaining)))
             .expect("poll_wait failed");
-        dbg!("poll done");
 
-
-        // who did something
+        // For every event...
         for event in &events {
-            dbg!(format!("event llopp with event {:?}", event));
+            println!("Event llopp with event {:?}", event);
+            // See if the event is associated with listening socket, tracker, or peers.
             match event.token() {
                 SERVER => {
-                    dbg!("server socket activity");
+                    println!("- Server socket activity -");
                     if let Ok((socket, peer_addr)) = serv_sock.accept() {
-                        println!("new client: {peer_addr:?}");
+                        println!("- New client accepted {:?} -", &peer_addr);
 
-                        // add peer !!! !!
+                        // Add the peer to the Peers struct.
                         if let Ok(peer) = peer_list.add_peer(peer_addr, socket, None) {
+                            // Register this peer for reading and writing in poll instance.
+                            // This is to allow reading and writing the handshake messages.
                             let token = get_new_token();
                             poll.registry()
                                 .register(
@@ -216,65 +195,60 @@ fn main() {
                                     Interest::WRITABLE | Interest::READABLE,
                                 )
                                 .expect(&format!("failed to register peer {:?}", peer_addr));
+                            // Save the mapping from token to peer's addr.
                             sockets.insert(token, peer_addr);
                         } else {
                             println!("already accepted peer {:?}", peer_addr);
                         }
                     } else {
                         println!("couldn't accept the client");
+                        println!("- Failed to accept the peer -");
                     }
                 }
                 TRACKER => {
-                    dbg!("tracker socket activity");
-                    // is it a readable ?? (receive blasted message)
-
+                    println!("- Tracker socket activity -");
+                    // If readable, receive response from tracker.
                     if event.is_readable() {
-                        dbg!("tracker readable");
+                        println!("- Tracker read event -");
                         let (data, response) = tracker::handle_tracker_response(
                             partial_tracker_data,
                             &mut tracker_sock,
                         );
-                        dbg!(&data);
-                        dbg!(&response);
-                        partial_tracker_data = data;
+                        partial_tracker_data = data; // Keep the buffer for the next (partial) read.
 
-                        match response {
-                            Some(tracker_response) => {
-                                // yay we got a full response, time to do things :)
-                                tracker_timeout =
-                                    Duration::new(tracker_response.interval.try_into().unwrap(), 0);
-                                // Duration::new(10, 0);
+                        if let Some(tracker_response) = response {
+                            println!("- Tracker response parsed {:?} -", &tracker_response);
+                            // Reset the tracker timer based on the interval received from tracker.
+                            tracker_timeout =
+                                Duration::new(tracker_response.interval.try_into().unwrap(), 0);
 
-                                // if let Some(tracker_id) = tracker_response.tracker_id {
-                                //     self_info.tracker_id = tracker_response.tracker_id;
-                                // }
+                            // Add all peers received from tracker to peer_list and register them
+                            // with the poll instance.
+                            add_all_peers(
+                                &mut poll,
+                                &mut peer_list,
+                                &mut sockets,
+                                tracker_response,
+                            );
 
-                                add_all_peers(
-                                    &mut poll,
-                                    &mut peer_list,
-                                    &mut sockets,
-                                    tracker_response,
-                                );
+                            // Deregister tracker socket, as response means connection is no longer needed.
+                            poll.registry()
+                                .deregister(&mut tracker_sock)
+                                .expect("tracker deregister fail");
 
-                                poll.registry()
-                                    .deregister(&mut tracker_sock)
-                                    .expect("tracker deregister fail");
-
-                                tracker_sock
-                                    .shutdown(net::Shutdown::Both)
-                                    .expect("tracker was not shutdown :(");
-                                dbg!("tracker shutdown!!");
-                            }
-                            None => {
-                                // cringe !!! 727 WYSI !!! (it was 7:27 at the time of writing this code)
-                            }
+                            // Shut down the tracker for reasons mentioned above.
+                            tracker_sock
+                                .shutdown(net::Shutdown::Both)
+                                .expect("tracker was not shutdown :(");
+                            println!("- Tracker connection closed -");
+                        } else {
+                            println!("- Tracker partial read -");
                         }
                     }
-                    // is it a writable ?? (blast message out)
+                    // If writable, send request to tracker.
                     else if event.is_writable() {
-                        dbg!("tracker writable");
-                        dbg!(get_info_hash());
-                        dbg!(tracker::bytes_to_urlencoding(&get_info_hash()));
+                        println!("- Tracker write event -");
+                        // Create and send a tracker request.
                         let tracker_request = TrackerRequest::new(
                             get_info_hash(),
                             &self_info.peer_id.to_vec(),
@@ -291,19 +265,24 @@ fn main() {
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
 
+                        // If this is the first request, change tracker event from
+                        // started to periodic.
                         if self_info.tracker_event == Event::STARTED {
                             self_info.tracker_event = Event::PERIODIC;
                         }
 
+                        // Register the socket for reading response.
                         poll.registry()
                             .reregister(&mut tracker_sock, TRACKER, Interest::READABLE)
                             .expect("tracker rereg fail");
+                        println!("- Tracker request sent {:?}-", tracker_request);
                     }
                 }
                 token => {
-                    dbg!("peer socket activity with token {:?}", token);
+                    println!("- Peer socket activity with {:?} -", &token);
                     // something went wrong so uh idc about you anymore
                     if event.is_error() || event.is_read_closed() {
+                        println!("- Peer socket error or connection closed. Dropping peer... -");
                         let peer_addr = sockets.remove(&token).unwrap();
                         let peer = peer_list.remove_peer(peer_addr).unwrap();
                         // you cant shutdown a non connected socket (as we have figured out very quickly)
@@ -318,18 +297,19 @@ fn main() {
                         // have we completed the peer yet?
                         let peer = peer_list.find_peer(peer_addr).unwrap();
                         if peer.is_complete() {
+                            println!("- Handling peer {:?} -", &peer_addr);
                             handle_peer(peer, &mut output_file);
                         }
                         // no we havent
                         else {
                             if event.is_readable() {
-                                dbg!("Got a handshake from peer");
+                                println!("- Received handshake from peer {:?} -", &peer_addr);
                                 let peer_id = p2p::recv_handshake(peer.get_mut_socket()).unwrap();
                                 peer_list
                                     .complete_peer(peer_addr, &peer_id.try_into().unwrap())
                                     .unwrap();
                             } else if event.is_writable() {
-                                dbg!("Sent a handshake to peer");
+                                println!("- Sent handshake to peer {:?} -", &peer_addr);
                                 p2p::send_handshake(peer, &self_info.peer_id, &output_file)
                                     .expect("failed to send handshake");
                                 // only care about readable events from now on
@@ -368,10 +348,7 @@ fn add_all_peers(
                     )
                     .expect(&format!("failed to register peer {:?}", peer_addr));
                 sockets.insert(token, peer_addr);
-                dbg!(format!(
-                    "syn'd and added peer {:?} with token {:?}",
-                    peer_addr, token
-                ));
+                println!("- Syn'd and added peer {:?} with {:?} -", peer_addr, token);
             } else {
                 println!("already connected to peer {:?}", peer_addr);
             }
@@ -381,21 +358,21 @@ fn add_all_peers(
     }
 }
 
+/// Obtains new token with every function call by incrementing static variable.
 fn get_new_token() -> Token {
     static TOKEN_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(2);
     Token(TOKEN_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
 }
 
-/// handles the message it got from a peer
+/// Handles the message received from a peer.
 fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
-    dbg!(format!("handling peer {:?}", peer));
     p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
                                                                  // TODO: should remove peer if error reading? (question mark?)
                                                                  //
     let messages = peer.messages.messages.clone();
 
     for msg in messages {
-        dbg!(format!("message is {:?}", msg));
+        println!("Message is {:?}", msg);
         match msg {
             MessageType::Choke => {
                 peer.peer_choking = true;
@@ -436,6 +413,7 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
                 output_file
                     .write_block(index.try_into().unwrap(), begin.try_into().unwrap(), block)
                     .expect("failed to write block");
+                dbg!(output_file.get_file_bitfield());
             }
             MessageType::Cancel {
                 index,

@@ -54,12 +54,12 @@ impl OutputFile {
             Some(OutputFile {
                 file,
                 length,
-                block_size,
+                block_size: BLOCK_SIZE,
                 num_pieces,
                 piece_size,
                 last_piece_size: length - ((num_pieces - 1) * piece_size),
                 bytes: vec![bitvec![u8, Msb0; 0; piece_size]; num_pieces],
-                blocks: vec![bitvec![u8, Msb0; 0; piece_size / block_size]; num_pieces],
+                blocks: vec![bitvec![u8, Msb0; 0; piece_size.div_ceil(block_size)]; num_pieces],
                 pieces: bitvec![u8, Msb0; 0; num_pieces],
             })
         } else {
@@ -73,6 +73,10 @@ impl OutputFile {
 
     pub fn get_num_pieces(&self) -> usize {
         self.num_pieces
+    }
+
+    pub fn get_piece_size(&self) -> usize {
+        self.piece_size
     }
 
     pub fn get_file_bitfield(&self) -> BitVec<u8, Msb0> {
@@ -105,7 +109,7 @@ impl OutputFile {
                 self.bytes[index].set(i, true);
             }
 
-            self.blocks[index].set(begin / BLOCK_SIZE, true); //NOTE: Sus
+            self.blocks[index].set(begin.div_ceil(BLOCK_SIZE), true); //NOTE: Sus
             let finished = self.is_piece_finished(index)?;
             if finished == true {
                 self.pieces.set(index, true);
@@ -179,7 +183,7 @@ impl OutputFile {
 
     pub fn is_block_finished(&self, index: usize, begin: usize) -> Option<bool> {
         self.blocks[index]
-            .get(begin / BLOCK_SIZE)
+            .get(begin.div_ceil(BLOCK_SIZE))
             .as_deref()
             .copied()
     }

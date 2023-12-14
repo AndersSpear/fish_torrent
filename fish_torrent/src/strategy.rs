@@ -101,22 +101,34 @@ impl Strategy {
                     // they are not choking us and we can ask them for the piece :)))
                     else {
                         let mut i = 0;
-                        while file.is_block_finished(piece, i).unwrap() || self.rqs.contains( &Request { peer_addr: *addr, index: piece, begin: i, length: BLOCK_SIZE }){
-                            i += 1;
+                        while i < file.get_piece_size()
+                            && (file.is_block_finished(piece, i).unwrap()
+                                || self.rqs.contains(&Request {
+                                    peer_addr: *addr,
+                                    index: piece,
+                                    begin: i,
+                                    length: BLOCK_SIZE,
+                                }))
+                        {
+                            i += BLOCK_SIZE;
                         }
 
-                        // should send the next block we want to request for that piece
-                        peer.get_mut_messages().messages.push(MessageType::Request {
-                            index: piece.try_into().unwrap(),
-                            begin: i.try_into().unwrap(),
-                            length: BLOCK_SIZE.try_into().unwrap(),
-                        });
-                        self.rqs.push(Request {
-                            peer_addr: *addr,
-                            index: piece,
-                            begin: i,
-                            length: BLOCK_SIZE,
-                        })
+                        // If i is greater than piece size, then there is nothing else
+                        // to request from this peer. Otherwise, add a request.
+                        if i < file.get_piece_size() {
+                            // should send the next block we want to request for that piece
+                            peer.get_mut_messages().messages.push(MessageType::Request {
+                                index: piece.try_into().unwrap(),
+                                begin: i.try_into().unwrap(),
+                                length: BLOCK_SIZE.try_into().unwrap(),
+                            });
+                            self.rqs.push(Request {
+                                peer_addr: *addr,
+                                index: piece,
+                                begin: i,
+                                length: BLOCK_SIZE,
+                            })
+                        }
                     }
                 }
             }

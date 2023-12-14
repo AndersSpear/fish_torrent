@@ -87,10 +87,15 @@ impl Messages {
 
         let mut sendbuf: Vec<u8> = vec![];
 
+        println!(
+            "- Preparing to send the following messages to {:?}- ",
+            sock.peer_addr()?
+        );
         for msg in self.messages {
             msg.send(&mut sendbuf)?;
         }
-        dbg!("right about to send to {}", sock.peer_addr()?);
+        //dbg!("right about to send to {}", sock.peer_addr()?);
+        println!("- Sending messages to {:?} -", sock.peer_addr()?);
         sock.write_all(&sendbuf)?;
         //dbg!("sent");
         Ok(())
@@ -119,7 +124,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
             return Err(e.into());
         }
     }
-    println!("read {} bytes from socket", local_buf.len());
+    dbg!("Read {} bytes", local_buf.len());
 
     let mut buf = &mut peer.recv_buffer;
     buf.append(&mut local_buf);
@@ -143,17 +148,17 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
 // TODO make sure this handles handshakes smile
 /// tries to parse one message from the buffer
 fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
-    
-
     if buf.len() < 4 {
-        dbg!("less than 4 bytes in buffer");
+        //dbg!("less than 4 bytes in buffer");
+        println!("Partial read from peer occurred");
         return None;
     }
     let len = BigEndian::read_u32(&buf[0..4]);
-    dbg!(len);
+    //dbg!(len);
     //this could break if buf[0..4] gets corrupted and is big
     if buf.len() < len as usize + 4 {
-        dbg!("not enough bytes in buffer");
+        //dbg!("not enough bytes in buffer");
+        println!("Partial read from peer occurred");
         return None;
     }
 
@@ -190,7 +195,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
             }
         },
         n => {
-            dbg!(buf[4]);
+            //dbg!(buf[4]);
             match buf[4] {
                 4 => {
                     if n == 5 {
@@ -204,7 +209,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                 5 => {
                     let field = BitVec::from_vec(buf[5..].to_vec());
                     buf.drain(0..5);
-                    buf.drain(0..(n as usize-1));
+                    buf.drain(0..(n as usize - 1));
                     MessageType::Bitfield { field }
                 }
                 6 => {
@@ -266,7 +271,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
 
 impl MessageType {
     fn send(self, buf: &mut Vec<u8>) -> Result<(), Error> {
-        dbg!(&self);
+        dbg!(format!("{:?}", &self));
         match self {
             MessageType::Choke => {
                 send_len_id(buf, 1, 0)?;

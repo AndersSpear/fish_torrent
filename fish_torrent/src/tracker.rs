@@ -32,6 +32,7 @@ struct Peer {
     port: u16,
 }
 
+#[derive(Debug)]
 pub struct TrackerRequest {
     info_hash: String,
     peer_id: String,
@@ -43,7 +44,7 @@ pub struct TrackerRequest {
     hostname: String,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Event {
     STARTED,
     STOPPED,
@@ -112,10 +113,10 @@ pub fn parse_body_from_response(response: &Vec<u8>) -> std::io::Result<Vec<u8>> 
     match separator_pos {
         Some(pos) => {
             let body_bytes = &response[pos..];
-            println!(
-                "BODY_BYTES BRUH{}",
-                String::from_utf8_lossy(body_bytes).to_string()
-            );
+            //println!(
+            //    "BODY_BYTES BRUH{}",
+            //    String::from_utf8_lossy(body_bytes).to_string()
+            //);
             Ok(body_bytes.to_vec())
         }
         None => Err(std::io::Error::new(
@@ -162,7 +163,7 @@ pub fn get_tracker_response_from_vec_u8(buf: &Vec<u8>) -> TrackerResponse {
 
     // Find the position of the double CRLF separator
     //iterates through byte vector
-    dbg!(buf);
+    //dbg!(buf);
     let body = parse_body_from_response(buf)
         .expect("parse_body_from_response in get_tracker_from_response fail");
 
@@ -182,7 +183,6 @@ pub fn get_tracker_response_from_vec_u8(buf: &Vec<u8>) -> TrackerResponse {
         interval: trb.interval,
         socket_addr_list: sock_addr_list,
     };
-    dbg!(&tr);
     tr
 }
 
