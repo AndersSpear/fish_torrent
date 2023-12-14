@@ -294,7 +294,7 @@ mod tests {
 
         let mut tracker_sock = TcpStream::from_std(
             std::net::TcpStream::connect(
-                *Url::parse("http://128.8.126.63:6969/announce")
+                *url::Url::parse("http://128.8.126.63:6969/announce")
                     .unwrap()
                     .socket_addrs(|| None)
                     .expect("could not connect to announce")
