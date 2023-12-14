@@ -124,7 +124,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
             return Err(e.into());
         }
     }
-    dbg!("Read {} bytes", local_buf.len());
+    println!("Read {} bytes", local_buf.len());
 
     let mut buf = &mut peer.recv_buffer;
     buf.append(&mut local_buf);
@@ -149,7 +149,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
 // TODO make sure this handles handshakes smile
 /// tries to parse one message from the buffer
 fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
-    dbg!(&buf);
+    //dbg!(&buf); // STOP PRETTY PRINTING SHIT IT'S ANNOYING
 
     if buf.len() < 4 {
         //dbg!("less than 4 bytes in buffer");
