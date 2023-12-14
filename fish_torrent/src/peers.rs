@@ -49,7 +49,7 @@ impl Peer {
             am_interested: false,
             peer_choking: true,
             peer_interested: false,
-            piece_bitfield: BitVec::new(),
+            piece_bitfield: bitvec![u8, Msb0; 0; super::torrent::get_number_of_pieces().try_into().unwrap()],
             piece_requests: Vec::new(),
             recv_buffer: Vec::new(),
             messages: Messages::new(),
