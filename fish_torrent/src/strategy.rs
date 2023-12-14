@@ -18,7 +18,7 @@ use super::p2p::{MessageType, Messages};
 use super::peers::Peers;
 
 pub struct Update {
-    peer_addr: SocketAddr,
+    peer_addr: Option<SocketAddr>,
     message: MessageType,
 }
 
@@ -51,6 +51,29 @@ impl Strategy {
         }
     }
 
+    pub fn push_update(&mut self, peer_addr: Option<SocketAddr>, message: MessageType) {
+        self.updates.push(Update { peer_addr: peer_addr, message: message });
+    }
+
+    // gets rid of all the requests in the list associated with some block
+    pub fn rm_requests_for_piece(&mut self, index: usize) {
+        let mut i = 0;
+        let mut to_remove = Vec::new();
+
+        // pepega loop to get indicies to remove
+        for req in &self.rqs {
+            if req.index == index as usize {
+                to_remove.push(i);
+            }
+
+            i += 1;
+        }
+
+        for idx in to_remove {
+            self.rqs.remove(idx);
+        }
+    }
+
     pub fn what_do(&mut self, peers: &mut Peers, file: &OutputFile) {
         // For every update that was given to strategy...
         // Handle them individually
@@ -64,7 +87,20 @@ impl Strategy {
                         .messages
                         .push(MessageType::Have { index });
                 }
+
+                // // also get rid of all the requests associated with that piece
+                // self.rm_requests_for_piece(index.try_into().unwrap());
+                // moved this logic to where the Have update was pushed because... I LOVE THE BORROW CHECKER!!!!!1
             }
+            // send all peers a keep alive message
+            else if let MessageType::KeepAlive = update.message {
+                for (addr, peer) in peers.get_peers_list() {
+                    peer.get_mut_messages()
+                        .messages
+                        .push(MessageType::KeepAlive);
+                }
+            }
+
         }
 
         // Choose pieces to focus on.

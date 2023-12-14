@@ -29,11 +29,12 @@ use url::Url;
 use crate::file::OutputFile;
 use crate::p2p::MessageType;
 use crate::peers::Peers;
-use crate::strategy::Strategy;
+use crate::strategy::{Strategy, Update};
 use crate::torrent::*;
 use crate::tracker::*;
 
-const STRATEGY_TIMEOUT: Duration = Duration::new(0, 500000000); // 100 milliseconds
+const STRATEGY_TIMEOUT: Duration = Duration::new(0, 500000000); // 100 milliseconds TODO: change back to .1 sec
+const KEEPALIVE_TIMEOUT: Duration = Duration::new(120, 0); // 2 minutes because T H E S P E C
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -132,16 +133,25 @@ fn main() {
         .expect("tracker register failed");
 
     // Set up the initial timers.
+    let mut keepalive_timer = Instant::now();
     let mut strategy_timer = Instant::now();
     let mut tracker_timer = Instant::now();
     let mut tracker_timeout: Duration = Duration::new(std::u64::MAX, 0);
 
     loop {
+        // should we send a keepalive?
+        if keepalive_timer.elapsed() > KEEPALIVE_TIMEOUT {
+            strategy_state.push_update(None, MessageType::KeepAlive);
+            keepalive_timer = Instant::now();
+        }
+
         // Strategy timeout.
         if strategy_timer.elapsed() > STRATEGY_TIMEOUT {
             println!(" === Strategy Timeout === ");
+
             strategy_state.what_do(&mut peer_list, &mut output_file);
             p2p::send_all(&mut peer_list).expect("failed to send all");
+
             strategy_timer = Instant::now();
         }
 
@@ -300,7 +310,7 @@ fn main() {
                         let peer = peer_list.find_peer(peer_addr).unwrap();
                         if peer.is_complete() {
                             println!("- Handling peer {:?} -", &peer_addr);
-                            handle_peer(peer, &mut output_file);
+                            handle_peer(peer_addr, peer, &mut output_file, &mut strategy_state);
                         }
                         // no we havent
                         else {
@@ -367,7 +377,7 @@ fn get_new_token() -> Token {
 }
 
 /// Handles the message received from a peer.
-fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
+fn handle_peer(peer_addr: SocketAddr, peer: &mut Peer, output_file: &mut OutputFile, strategy_state: &mut Strategy) {
     p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
                                                                  // TODO: should remove peer if error reading? (question mark?)
                                                                  //
@@ -412,9 +422,29 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
                 begin,
                 block,
             } => {
-                output_file
-                    .write_block(index.try_into().unwrap(), begin.try_into().unwrap(), block)
-                    .expect("failed to write block");
+                // did we finish the piece?
+                if let Ok(true) = output_file.write_block(
+                    index.try_into().unwrap(),
+                    begin.try_into().unwrap(),
+                    block,
+                ) {
+                    dbg!(format!("We have written all the blocks to piece {} (but hash ?)", index));
+                    // does the piece match with our hash
+                    if let Ok(true) = output_file.compare_piece_hash(
+                        index.try_into().unwrap(),
+                        &get_piece_hash(index.try_into().unwrap()).expect("failed to get piece hash"),
+                    ) {
+                        dbg!(format!("Hash for piece {} matches!!!", index));
+                        output_file.set_piece_finished(index.try_into().unwrap()).expect("failed to set piece to finished");
+                        strategy_state.rm_requests_for_piece(index.try_into().unwrap());
+                        // if so, we can push the update that we have completed a piece !!
+                        strategy_state.push_update(Some(peer_addr), MessageType::Have { index: index });
+                    } else {
+                        // otherwise, something went wrong when downloading the piece so lets try again :)
+                        output_file.clear_piece(index.try_into().unwrap()).expect("failed to clear piece");
+                        strategy_state.rm_requests_for_piece(index.try_into().unwrap());
+                    }
+                }
                 dbg!(output_file.get_file_bitfield());
             }
             MessageType::Cancel {
