@@ -11,7 +11,7 @@ use sha1::{Digest, Sha1};
 
 use anyhow::{Error, Result};
 
-pub const BLOCK_SIZE: usize = 16000; //bytes
+pub const BLOCK_SIZE: usize = 16384; //bytes
 
 pub struct OutputFile {
     file: File,

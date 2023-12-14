@@ -223,7 +223,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     let index = BigEndian::read_u32(&buf[5..9]);
                     let begin = BigEndian::read_u32(&buf[9..13]);
                     let length = BigEndian::read_u32(&buf[13..17]);
-                    buf.drain(0..18);
+                    buf.drain(0..17);
 
                     MessageType::Request {
                         index,
@@ -254,7 +254,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
                     let index = BigEndian::read_u32(&buf[5..9]);
                     let begin = BigEndian::read_u32(&buf[9..13]);
                     let length = BigEndian::read_u32(&buf[13..17]);
-                    buf.drain(0..18);
+                    buf.drain(0..17);
 
                     MessageType::Cancel {
                         index,
@@ -369,7 +369,7 @@ fn send_request_or_cancel(
     begin: u32,
     length: u32,
 ) -> Result<(), Error> {
-    let mut buf = vec![0; 18];
+    let mut buf = vec![0; 17];
     buf[0..4].copy_from_slice(&13_u32.to_be_bytes());
     buf[4] = if is_request_message { 6 } else { 8 }; // message id 6 is request, 8 is cancel
     buf[5..9].copy_from_slice(&index.to_be_bytes());
