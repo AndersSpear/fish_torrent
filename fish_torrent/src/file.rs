@@ -96,6 +96,10 @@ impl OutputFile {
         self.pieces.clone()
     }
 
+    pub fn is_file_finished(&self) -> bool {
+        self.pieces.first_zero().is_none()
+    }
+
     /// Writes a block (Vector) of bytes to the specified piece index and
     /// beginning offset.
     /// Returns true if this call to write_block finishes the piece specified by index.
