@@ -371,7 +371,9 @@ fn main() {
                         let peer = peer_list.remove_peer(peer_addr).unwrap();
                         // you cant shutdown a non connected socket (as we have figured out very quickly)
                         if !event.is_error() {
-                            peer.disconnect().expect("failed to disconnect peer");
+                            if let Ok(_) = peer.disconnect() {
+                                println!("Successfully disconnected peer!");
+                            }
                         }
                         continue;
                     }
