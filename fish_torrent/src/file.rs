@@ -84,6 +84,10 @@ impl OutputFile {
         self.piece_size
     }
 
+    pub fn get_blocks(&self) -> Vec<BitVec<u8, Msb0>> {
+        self.blocks.clone()
+    }
+
     pub fn get_file_bitfield(&self) -> BitVec<u8, Msb0> {
         self.pieces.clone()
     }
@@ -92,7 +96,7 @@ impl OutputFile {
     /// beginning offset.
     /// Returns true if this call to write_block finishes the piece specified by index.
     /// Propagates any errors due to arguments or file i/o issues.
-    pub fn write_block(&mut self, index: usize, begin: usize, block: Vec<u8>) -> Result<bool> {
+    pub fn write_block(&mut self, index: usize, begin: usize, mut block: Vec<u8>) -> Result<bool> {
         if index >= self.num_pieces {
             Err(Error::msg("index was larger than or equal to num_pieces!"))
         } else if (begin + block.len()) > self.piece_size {
@@ -103,7 +107,14 @@ impl OutputFile {
             ))
         } else if block.len() == 0 {
             Err(Error::msg("block is empty!"))
+        } else if begin % self.block_size != 0 {
+            Err(Error::msg("go fuck yourself"))
         } else {
+            if block.len() > self.block_size {
+                println!("Received block size too large. Writing the first {} bytes...", self.block_size);
+                block.drain(self.block_size..);
+            }
+
             // Write to file at specified location.
             self.file
                 .write_at(&block, ((index * self.piece_size) + begin).try_into()?)?;
@@ -114,8 +125,8 @@ impl OutputFile {
                 self.bytes[index].set(i, true);
             }
 
-            self.blocks[index].set(begin.div_ceil(BLOCK_SIZE), true); //NOTE: Sus
-            let finished = self.is_piece_finished(index)?;
+            self.blocks[index].set(begin.div_ceil(self.block_size), true); //NOTE: Sus
+            let finished = self.check_piece_finished(index)?;
             // Returned whether the piece was "finished" for hashing and using "set_piece_finished".
             //if finished == true {
             //    self.pieces.set(index, true);
@@ -206,7 +217,7 @@ impl OutputFile {
 
         let mut hash: [u8; 20] = [0; 20];
         let mut hasher = Sha1::new();
-        if self.is_piece_finished(index)? == true {
+        if self.check_piece_finished(index)? == true {
             hasher.update(self.read_block(
                 index,
                 0,
@@ -231,13 +242,13 @@ impl OutputFile {
         }
         // This handles if index or begin is too large.
         self.blocks[index]
-            .get(begin.div_ceil(BLOCK_SIZE))
+            .get(begin.div_ceil(self.block_size))
             .as_deref()
             .copied()
     }
 
     /// Check to see if the piece was finished.
-    fn is_piece_finished(&self, index: usize) -> Result<bool> {
+    fn check_piece_finished(&self, index: usize) -> Result<bool> {
         if index >= self.num_pieces {
             return Err(Error::msg(
                 "Index greater than or equal to the number of pieces!",
@@ -277,27 +288,33 @@ mod test {
         let mut test_file = OutputFile::new(filename, filesize, 5, 5, 1).unwrap();
         // Write some data. MUST FILL PIECE OR READ WILL FAIL.
         _ = test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd', b'e']));
-        _ = test_file.write_block(1, 0, Vec::from([b'x', b'y', b'z', b't', b'v']));
-        assert_eq!(test_file.is_piece_finished(0).unwrap(), true);
+        for i in 0..5 {
+            _ = test_file.write_block(0, i, Vec::from([b'a']));
+            _ = test_file.write_block(1, i, Vec::from([b'z']));
+        }
+        assert_eq!(test_file.check_piece_finished(0).unwrap(), true);
         test_file.set_piece_finished(0);
-        assert_eq!(test_file.is_piece_finished(1).unwrap(), true);
+        assert_eq!(test_file.check_piece_finished(1).unwrap(), true);
         test_file.set_piece_finished(1);
         // See if that data reads back.
         let test = test_file.read_block(0, 0, 4).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
-        assert_eq!(test, Vec::from([b'a', b'b', b'c', b'd']));
+        assert_eq!(test, Vec::from([b'a', b'a', b'a', b'a']));
         let test = test_file.read_block(1, 0, 3).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
-        assert_eq!(test, Vec::from([b'x', b'y', b'z']));
+        assert_eq!(test, Vec::from([b'z', b'z', b'z']));
         // Write some more data, this time at an offset. And read it back.
-        _ = test_file.write_block(0, 3, Vec::from([b't', b'v']));
+        _ = test_file.write_block(0, 3, Vec::from([b't']));
+        _ = test_file.write_block(0, 4, Vec::from([b'v']));
         let test = test_file.read_block(0, 3, 2).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b't', b'v']));
         // Write data up to the very end of the last piece
-        _ = test_file.write_block(4, 0, Vec::from([b'a', b'b', b'c']));
-        assert_eq!(test_file.is_piece_finished(4).unwrap(), true);
+        _ = test_file.write_block(4, 0, Vec::from([b'a']));
+        _ = test_file.write_block(4, 1, Vec::from([b'b']));
+        _ = test_file.write_block(4, 2, Vec::from([b'c']));
         test_file.set_piece_finished(4);
+        assert_eq!(test_file.check_piece_finished(4).unwrap(), true);
         let test = test_file.read_block(4, 0, 3).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b'a', b'b', b'c']));
@@ -498,7 +515,32 @@ mod test {
     }
 
     #[test]
-    fn test_bitvec_part_2() {}
+    #[ignore]
+    fn test_bitvec_part_2() {
+        let filename = "file.rs.bitvec_part_2.output";
+        let _ = fs::remove_file(filename);
+        let num_pieces = 2;
+        let piece_size = 5;
+        let block_size = 1;
+        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
+
+        // Assert that everything is initialized correctly.
+        assert_eq!(test_file.get_file_bitfield(), BitVec::from_bitslice(bits![u8, Msb0; 0, 0]));
+        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 0, 0, 0, 0, 0]));
+        // This should drop a lot of bytes.
+        _ = test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd', b'e']));
+        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 0, 0, 0]));
+        for i in 0..piece_size {
+            _ = test_file.write_block(0, i, Vec::from([b'a']));
+        }
+        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 1, 1, 1, 1, 1]));
+        test_file.set_piece_finished(0);
+        assert_eq!(test_file.get_file_bitfield(), BitVec::from_bitslice(bits![u8, Msb0; 1, 0]));
+
+        test_file.clear_piece(0);
+        assert_eq!(test_file.get_blocks()[0], BitVec::from_bitslice(bits![u8, Msb0; 0, 0, 0, 0, 0]));
+        assert_eq!(test_file.get_file_bitfield(), BitVec::from_bitslice(bits![u8, Msb0; 0, 0]));
+    }
 
     #[test]
     fn test_helper_methods() {
