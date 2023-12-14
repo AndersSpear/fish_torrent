@@ -7,7 +7,6 @@
 
 use bendy::decoding::{Decoder, Object};
 use bendy::serde::from_bytes;
-use bitvec::index;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::fs::read;

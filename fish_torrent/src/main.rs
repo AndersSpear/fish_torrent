@@ -1,6 +1,7 @@
 #![feature(lazy_cell)]
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(unused_imports)]
 #![allow(unreachable_code)]
 #![warn(missing_docs)]
 //! handles initial call to tracker and peer

@@ -6,13 +6,13 @@ use mio::net::TcpStream;
 use serde::{Deserialize, Serialize};
 use std::ascii::escape_default;
 use std::io::prelude::*;
-use url::Url;
-use urlencoding::encode;
+
+use std::net::{IpAddr, SocketAddr};
+
 // enum Peers {
 //     Compact(Vec<u8>),
 //     NonCompact(Vec<Peer>),
 // }
-use crate::torrent::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TrackerResponseBeta {
@@ -139,7 +139,6 @@ pub fn send_tracker_request(
     stream.flush()?;
     Ok(())
 }
-use bendy::decoding::{Error, FromBencode, Object};
 
 fn show(bs: &[u8]) -> String {
     let mut visible = String::new();
@@ -150,9 +149,8 @@ fn show(bs: &[u8]) -> String {
     visible
 }
 
-use bendy::decoding::Decoder;
-use std::io::Cursor;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+
 
 pub fn get_tracker_response_from_vec_u8(buf: &Vec<u8>) -> TrackerResponse {
     //if Ok, we have received n bytes and placed into response_data.
