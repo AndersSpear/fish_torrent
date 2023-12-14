@@ -463,21 +463,12 @@ mod test {
 
         // This should fully fill the piece and return true.
         assert_eq!(test_file.get_file_bitfield()[1], false);
-        for i in 0..piece_size {
-
+        for i in 0..piece_size - 1 {
+            test_file.write_block(1, i, Vec::from([99 + i as u8]));
         }
-        assert_eq!(
-            test_file
-                .write_block(
-                    1,
-                    0,
-                    Vec::from([b'c', b'd', b'e', b'f', b'g', b'h', b'i', b'j', b'k', b'l'])
-                )
-                .unwrap(),
-            true
-        );
+        assert_eq!(test_file.write_block(1, 9, Vec::from([b'l'])).unwrap(), true);
         assert_eq!(test_file.check_piece_finished(1).unwrap(), true);
-        _ = test_file.set_piece_finished(1);
+        test_file.set_piece_finished(1).unwrap();
         assert_eq!(test_file.get_file_bitfield()[1], true);
         //dbg!(&test_file.bytes[1]);
     }
