@@ -424,13 +424,8 @@ mod test {
         let _ = fs::remove_file(filename);
         let num_pieces = 2;
         let piece_size = 5;
-<<<<<<< HEAD
-        let mut test_file =
-            OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
-=======
         let block_size = 1;
         let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
->>>>>>> e17973f (Improved API and changed some test)
 
         // Write a piece "abcde".
         assert_eq!(
