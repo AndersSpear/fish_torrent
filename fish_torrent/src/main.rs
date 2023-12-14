@@ -139,6 +139,7 @@ fn main() {
     let mut tracker_timeout: Duration = Duration::new(std::u64::MAX, 0);
 
     loop {
+        dbg!(output_file.get_file_bitfield());
         // should we send a keepalive?
         if keepalive_timer.elapsed() > KEEPALIVE_TIMEOUT {
             strategy_state.push_update(None, MessageType::KeepAlive);
@@ -466,6 +467,8 @@ fn handle_peer(peer_addr: SocketAddr, peer: &mut Peer, output_file: &mut OutputF
               // }
         }
     }
+
+    peer.messages.messages.clear();
 }
 
 fn create_peer_id() -> [u8; 20] {

@@ -135,7 +135,7 @@ impl Strategy {
                         peer.am_interested = true;
                     }
                     // they are not choking us and we can ask them for the piece :)))
-                    else {
+                    else if !peer.peer_choking {
                         // TODO: send more than one block at once?
                         let mut i = 0;
                         while i < file.get_piece_size()
