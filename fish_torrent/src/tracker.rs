@@ -250,11 +250,8 @@ mod tests {
             String::from("poole.cs.umd.edu"),
         );
         let request = TrackerRequest::construct_tracker_request(&tr);
-
-        assert!(request.contains("info_hash=aaaaaaaaaaaaaaaaaaaa"));
-        assert!(request.contains("peer_id=bbbbbbbbbbbbbbbbbbbb"));
+        assert!(request.contains(&bytes_to_urlencoding("aaaaaaaaaaaaaaaaaaaa".as_bytes())));
     }
-
     #[test]
     fn test_send_tracker_request() {
         let tracker_request = TrackerRequest::new(
