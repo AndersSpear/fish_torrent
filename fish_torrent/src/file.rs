@@ -13,11 +13,15 @@ use anyhow::{Error, Result};
 
 pub struct OutputFile {
     file: File,
+    length: usize,
+    block_size: usize,
     // The two fields below are technically redundant but eh.
     num_pieces: usize,
     piece_size: usize,
-    pieces: Vec<BitVec<u8, Msb0>>,
-    file_bitfield: BitVec<u8, Msb0>,
+    last_piece_size: usize,
+    bytes: Vec<BitVec<u8, Msb0>>,
+    blocks: Vec<BitVec<u8, Msb0>>,
+    pieces: BitVec<u8, Msb0>,
 }
 
 impl OutputFile {
@@ -26,7 +30,7 @@ impl OutputFile {
     /// The latter two arguments will be checked on any given read
     /// or write call.
     /// Returns None if the file was not able to be created for any reason.
-    pub fn new(name: &str, num_pieces: usize, piece_size: usize) -> Option<Self> {
+    pub fn new(name: &str, length: usize, num_pieces: usize, piece_size: usize) -> Option<Self> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -39,27 +43,34 @@ impl OutputFile {
             // This prevents possible panics from reading memory that has not
             // been written to yet.
             use std::io::{Seek, SeekFrom};
-            file.seek(SeekFrom::Start(
-                ((num_pieces * piece_size) - 1).try_into().ok()?,
-            ))
-            .ok()?;
+            file.seek(SeekFrom::Start((length - 1).try_into().ok()?))
+                .ok()?;
             file.write_all(&[0]).ok()?;
             file.seek(SeekFrom::Start(0)).ok()?;
 
+            let block_size: usize = 16000; //bytes
             Some(OutputFile {
                 file,
+                length,
+                block_size,
                 num_pieces,
                 piece_size,
-                pieces: vec![bitvec![u8, Msb0; 0; piece_size]; num_pieces],
-                file_bitfield: bitvec![u8, Msb0; 0; num_pieces],
+                last_piece_size: length - ((num_pieces - 1) * piece_size),
+                bytes: vec![bitvec![u8, Msb0; 0; piece_size]; num_pieces],
+                blocks: vec![bitvec![u8, Msb0; 0; piece_size / block_size]; num_pieces],
+                pieces: bitvec![u8, Msb0; 0; num_pieces],
             })
         } else {
             None
         }
     }
 
+    pub fn get_file_length(&self) -> usize {
+        self.length
+    }
+
     pub fn get_file_bitfield(&self) -> BitVec<u8, Msb0> {
-        self.file_bitfield.clone()
+        self.pieces.clone()
     }
 
     /// Writes a block (Vector) of bytes to the specified piece index and
@@ -71,6 +82,10 @@ impl OutputFile {
             Err(Error::msg("index was larger than or equal to num_pieces!"))
         } else if (begin + block.len()) > self.piece_size {
             Err(Error::msg("begin + block len was larger than piece size!"))
+        } else if index == num_pieces - 1 && begin + block.len() > self.last_piece_size {
+            Err(Error::msg(
+                "begin + block len was larger than last piece size!",
+            ))
         } else if block.len() == 0 {
             Err(Error::msg("block is empty!"))
         } else {
@@ -81,12 +96,12 @@ impl OutputFile {
 
             // Record the bytes written in pieces.
             for i in begin..(begin + block.len()) {
-                self.pieces[index].set(i, true);
+                self.bytes[index].set(i, true);
             }
 
             let finished = self.is_piece_finished(index)?;
             if finished == true {
-                self.file_bitfield.set(index, true);
+                self.pieces.set(index, true);
             }
             Ok(finished)
         }
@@ -102,13 +117,16 @@ impl OutputFile {
 
         if index >= self.num_pieces {
             Err(Error::msg("index was larger than or equal to num_pieces!"))
-        }
-        // This math is a little confusing--begin is an index but length is not,
-        // so a >= would cause a false error.
-        // Ex. num_pieces 5 piece_size 10
-        // index 4 begin 5 length 5. This should be valid because we start writing at the 5th index.
-        else if begin + length > self.piece_size {
+        } else if begin + length > self.piece_size {
+            // This math is a little confusing--begin is an index but length is not,
+            // so a >= would cause a false error.
+            // Ex. num_pieces 5 piece_size 10
+            // index 4 begin 5 length 5. This should be valid because we start writing at the 5th index.
             Err(Error::msg("begin + length was larger than piece size!"))
+        } else if index == num_pieces - 1 && begin + block.len() > self.last_piece_size {
+            Err(Error::msg(
+                "begin + length was larger than last piece size!",
+            ))
         } else {
             let res = self
                 .file
@@ -132,7 +150,15 @@ impl OutputFile {
         let mut hash: [u8; 20] = [0; 20];
         let mut hasher = Sha1::new();
         if self.is_piece_finished(index)? == true {
-            hasher.update(self.read_block(index, 0, self.piece_size)?);
+            hasher.update(self.read_block(
+                index,
+                0,
+                if index == self.num_pieces - 1 {
+                    self.last_piece_size
+                } else {
+                    self.piece_size
+                },
+            )?);
             hasher.finalize_into((&mut hash).into());
             Ok(hash)
         } else {
@@ -145,7 +171,7 @@ impl OutputFile {
     /// Check to see if the piece was finished.
     fn is_piece_finished(&self, index: usize) -> Result<bool> {
         for i in 0..self.piece_size {
-            let &bit = self.pieces[index].get(i).as_deref().expect(
+            let &bit = self.bytes[index].get(i).as_deref().expect(
                 "Unknown edge case where OutputFile.pieces was not
                 properly initialized or bounds were not properly checked.",
             );
@@ -256,8 +282,8 @@ mod test {
         let mut test_file = OutputFile::new(filename, num_pieces, piece_size).unwrap();
 
         // Check to make sure that the BitVec intialized as expected.
-        assert_eq!(test_file.pieces.len(), num_pieces);
-        for i in &test_file.pieces {
+        assert_eq!(test_file.bytes.len(), num_pieces);
+        for i in &test_file.bytes {
             assert_eq!(i.len(), piece_size);
             for j in i {
                 assert_eq!(j, false);
@@ -265,8 +291,8 @@ mod test {
         }
 
         // Write to file and check to make sure that BitVec matches the bytes written.
-        //dbg!(&test_file.pieces[0]);
-        //dbg!(&test_file.pieces[1]);
+        //dbg!(&test_file.bytes[0]);
+        //dbg!(&test_file.bytes[1]);
         // No writes should return true, as none of them fill the piece.
         assert_eq!(
             test_file
@@ -286,21 +312,21 @@ mod test {
                 .unwrap(),
             false
         );
-        assert_eq!(test_file.pieces[0].get(0).as_deref().unwrap(), &true);
-        assert_eq!(test_file.pieces[0].get(1).as_deref().unwrap(), &true);
-        assert_eq!(test_file.pieces[0].get(5).as_deref().unwrap(), &true);
-        assert_eq!(test_file.pieces[0].get(6).as_deref().unwrap(), &true);
-        assert_eq!(test_file.pieces[0].get(7).as_deref().unwrap(), &true);
-        assert_eq!(test_file.pieces[1].get(0).as_deref().unwrap(), &true);
-        assert_eq!(test_file.pieces[1].get(1).as_deref().unwrap(), &true);
-        //dbg!(&test_file.pieces[0]);
-        //dbg!(&test_file.pieces[1]);
+        assert_eq!(test_file.bytes[0].get(0).as_deref().unwrap(), &true);
+        assert_eq!(test_file.bytes[0].get(1).as_deref().unwrap(), &true);
+        assert_eq!(test_file.bytes[0].get(5).as_deref().unwrap(), &true);
+        assert_eq!(test_file.bytes[0].get(6).as_deref().unwrap(), &true);
+        assert_eq!(test_file.bytes[0].get(7).as_deref().unwrap(), &true);
+        assert_eq!(test_file.bytes[1].get(0).as_deref().unwrap(), &true);
+        assert_eq!(test_file.bytes[1].get(1).as_deref().unwrap(), &true);
+        //dbg!(&test_file.bytes[0]);
+        //dbg!(&test_file.bytes[1]);
 
         // Random spot checks to make sure bits weren't randomly flipped.
-        assert_eq!(test_file.pieces[0].get(2).as_deref().unwrap(), &false);
-        assert_eq!(test_file.pieces[0].get(9).as_deref().unwrap(), &false);
-        assert_eq!(test_file.pieces[1].get(2).as_deref().unwrap(), &false);
-        assert_eq!(test_file.pieces[1].get(7).as_deref().unwrap(), &false);
+        assert_eq!(test_file.bytes[0].get(2).as_deref().unwrap(), &false);
+        assert_eq!(test_file.bytes[0].get(9).as_deref().unwrap(), &false);
+        assert_eq!(test_file.bytes[1].get(2).as_deref().unwrap(), &false);
+        assert_eq!(test_file.bytes[1].get(7).as_deref().unwrap(), &false);
 
         // This should fully fill the piece and return true.
         assert_eq!(test_file.get_file_bitfield()[1], false);
@@ -315,7 +341,7 @@ mod test {
             true
         );
         assert_eq!(test_file.get_file_bitfield()[1], true);
-        //dbg!(&test_file.pieces[1]);
+        //dbg!(&test_file.bytes[1]);
     }
 
     #[test]
