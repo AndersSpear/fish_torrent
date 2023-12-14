@@ -132,7 +132,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
     loop {
         match parse_message(&mut buf) {
             Some(msg) => {
-                dbg!(&msg);
+                //dbg!(&msg); // STOP PRETTY PRINTING SHIT IT'S ANNOYING
                 return_msgs.messages.push(msg);
             }
             None => {
