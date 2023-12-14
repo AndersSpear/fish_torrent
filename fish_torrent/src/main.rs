@@ -275,6 +275,7 @@ fn main() {
                             self_info.downloaded,
                             self_info.left,
                             self_info.tracker_event,
+                            Url::parse(get_tracker_url()).unwrap().host_str().unwrap().to_string(),
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
 

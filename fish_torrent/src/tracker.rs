@@ -40,6 +40,7 @@ pub struct TrackerRequest {
     downloaded: usize,
     left: usize,
     event: Event,
+    hostname: String,
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -70,6 +71,7 @@ impl TrackerRequest {
         downloaded: usize,
         left: usize,
         event: Event,
+        hostname: String,
     ) -> TrackerRequest {
         TrackerRequest {
             info_hash: bytes_to_urlencoding(info_hash),
@@ -79,6 +81,7 @@ impl TrackerRequest {
             downloaded,
             left,
             event,
+            hostname,
         }
     }
 
@@ -88,14 +91,14 @@ impl TrackerRequest {
         //let encoded_peer_id = encode(&self.peer_id);
         if let Some(event_str) = self.event.as_str() {
             format!(
-                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
+                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=1 HTTP/1.1\r\nHost: {}\r\n\r\n",
                 //encoded_info_hash, encoded_peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
-                self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str
+                self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left, event_str, self.hostname
             )
         } else {
             format!(
-                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1 HTTP/1.1\r\nHost: poole.cs.umd.edu\r\n\r\n",
-                self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left)
+                "GET /announce?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1 HTTP/1.1\r\nHost: {}]\r\n\r\n",
+                self.info_hash, self.peer_id, self.port, self.uploaded, self.downloaded, self.left, self.hostname)
         }
     }
 }
