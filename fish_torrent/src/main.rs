@@ -139,9 +139,9 @@ fn main() {
     let mut tracker_timeout: Duration = Duration::new(std::u64::MAX, 0);
 
     loop {
-        dbg!(output_file.get_file_bitfield());
         // should we send a keepalive?
         if keepalive_timer.elapsed() > KEEPALIVE_TIMEOUT {
+            println!(" === KeepAlive Timeout === ");
             strategy_state.push_update(None, MessageType::KeepAlive);
             keepalive_timer = Instant::now();
         }
