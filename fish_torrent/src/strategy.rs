@@ -90,10 +90,11 @@ impl Strategy {
                 // the peer says they have the piece we want 🧩
                 if let Some(true) = peer.check_piece_bitfield(piece) {
                     // but they are choking us :(((( 🐒
-                    if peer.peer_choking {
+                    if peer.peer_choking && !peer.am_interested {
                         peer.get_mut_messages()
                             .messages
                             .push(MessageType::Interested);
+                        peer.am_interested = true;
                     }
                     // they are not choking us and we can ask them for the piece :)))
                     else {
