@@ -60,21 +60,20 @@ impl Strategy {
 
     // gets rid of all the requests in the list associated with some block
     pub fn rm_requests_for_piece(&mut self, index: usize) {
-        let mut i = 0;
-        let mut to_remove = Vec::new();
+        // the non pepega method
+        self.rqs.retain(|req| req.index != index as usize);
 
-        // pepega loop to get indicies to remove
-        for req in &self.rqs {
-            if req.index == index as usize {
-                to_remove.push(i);
-            }
+        // let mut to_remove = Vec::new();
+        // // pepega loop to get indicies to remove
+        // for (i, req) in self.rqs.iter().enumerate() {
+        //     if req.index == index as usize {
+        //         to_remove.push(i);
+        //     }
+        // }
 
-            i += 1;
-        }
-
-        for idx in to_remove {
-            self.rqs.remove(idx);
-        }
+        // for idx in to_remove {
+        //     self.rqs.remove(idx);
+        // }
     }
 
     pub fn rm_all_requests(&mut self) {
@@ -168,6 +167,7 @@ impl Strategy {
                             }
 
                             if piece == 1 && i == BLOCK_SIZE {
+                                dbg!(block_len);
                                 continue;
                             }
 
