@@ -9,6 +9,7 @@ use std::net::SocketAddr;
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
 use rand::random;
+use sha1::digest::block_buffer::Block;
 
 use crate::file::BLOCK_SIZE;
 
@@ -21,6 +22,7 @@ pub struct Update {
     message: MessageType,
 }
 
+#[derive(PartialEq)]
 pub struct Request {
     peer_addr: SocketAddr,
     index: usize,
@@ -99,7 +101,7 @@ impl Strategy {
                     // they are not choking us and we can ask them for the piece :)))
                     else {
                         let mut i = 0;
-                        while file.is_block_finished(piece, i).unwrap() {
+                        while file.is_block_finished(piece, i).unwrap() || self.rqs.contains( &Request { peer_addr: *addr, index: piece, begin: i, length: BLOCK_SIZE }){
                             i += 1;
                         }
 
