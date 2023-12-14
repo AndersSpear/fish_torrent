@@ -154,7 +154,7 @@ fn main() {
     .unwrap();
 
     // Initialize strategy state.
-    let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 5); // TODO make not 5
+    let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 100); // TODO make not 5
 
     // Holds the partially read data from a tracker response.
     let mut partial_tracker_data = Vec::new();
@@ -201,6 +201,7 @@ fn main() {
 
     loop {
         // check if you have downloaded the file
+        println!(" === Completed {} pieces out of {} === ", output_file.get_file_bitfield().count_ones(), output_file.get_num_pieces());
         if output_file.is_file_finished() {
             println!("🦀🦀🦀🦀 You have downloaded {} successfully!! Congrats!!! 🦀🦀🦀🦀", get_file_name());
         }
@@ -489,7 +490,11 @@ fn handle_peer(
     let messages = peer.messages.messages.clone();
 
     for msg in messages {
-        println!("Message is {:?}", msg);
+        if let MessageType::Piece{ index, begin, _ } = msg {
+            println!("Message is Piece with index {} and begin {}", index, begin);
+        } else {
+            println!("Message is {:?}", msg);
+        }
         match msg {
             MessageType::Choke => {
                 peer.peer_choking = true;
