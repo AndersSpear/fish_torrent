@@ -470,7 +470,7 @@ mod test {
             //init torrent struct with infohash
             torrent::parse_torrent_file("../artofwar.torrent");
 
-            let file = OutputFile::new("p2p.rs.test", 25, 5, 5).unwrap();
+            let file = OutputFile::new("p2p.rs.test", 25, 5, 5, 1).unwrap();
             //send handshake
             send_handshake(&mut other_peer, &[b'a'; 20], &file).unwrap();
             //recv handshake

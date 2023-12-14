@@ -101,6 +101,7 @@ fn main() {
         get_file_length().try_into().unwrap(),
         get_number_of_pieces().try_into().unwrap(),
         get_piece_length().try_into().unwrap(),
+        file::BLOCK_SIZE,
     )
     .unwrap();
 
@@ -448,7 +449,6 @@ mod test {
     use bitvec::{bits, order::Msb0, vec::BitVec};
 
     #[test]
-    #[ignore]
     fn test_bitfield_drain() {
         let num_pieces = 3;
         let mut correct_field = BitVec::<u8, Msb0>::new();

@@ -32,7 +32,7 @@ impl OutputFile {
     /// The latter two arguments will be checked on any given read
     /// or write call.
     /// Returns None if the file was not able to be created for any reason.
-    pub fn new(name: &str, length: usize, num_pieces: usize, piece_size: usize) -> Option<Self> {
+    pub fn new(name: &str, length: usize, num_pieces: usize, piece_size: usize, block_size: usize) -> Option<Self> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -50,11 +50,10 @@ impl OutputFile {
             file.write_all(&[0]).ok()?;
             file.seek(SeekFrom::Start(0)).ok()?;
 
-            let block_size: usize = 16000; //bytes
             Some(OutputFile {
                 file,
                 length,
-                block_size: BLOCK_SIZE,
+                block_size,
                 num_pieces,
                 piece_size,
                 last_piece_size: length - ((num_pieces - 1) * piece_size),
@@ -111,9 +110,10 @@ impl OutputFile {
 
             self.blocks[index].set(begin.div_ceil(BLOCK_SIZE), true); //NOTE: Sus
             let finished = self.is_piece_finished(index)?;
-            if finished == true {
-                self.pieces.set(index, true);
-            }
+            // Returned whether the piece was "finished" for hashing and using "set_piece_finished".
+            //if finished == true {
+            //    self.pieces.set(index, true);
+            //}
             Ok(finished)
         }
     }
@@ -151,15 +151,45 @@ impl OutputFile {
         }
     }
 
+    pub fn clear_piece(&mut self, index: usize) -> Result<()> {
+        if index >= self.num_pieces {
+            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+        }
+
+        for i in 0..self.blocks[index].len() {
+            self.blocks[index].set(i, false);
+        }
+
+        self.pieces.set(index, false);
+        Ok(())
+    }
+
+    pub fn set_piece_finished(&mut self, index: usize) -> Result<()> {
+        if index >= self.num_pieces {
+            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+        }
+
+        self.pieces.set(index, true);
+        Ok(())
+    }
+
     /// Compares the hash of a piece specified by the index argument
     /// and the 20-byte hash argument.
     pub fn compare_piece_hash(&self, index: usize, hash: &[u8; 20]) -> Result<bool> {
+        if index >= self.num_pieces {
+            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+        }
+
         Ok(self.hash_piece(index)? == *hash)
     }
 
     /// Given a specific index, this function will read the corresponding piece
     /// from the file and return that pieces SHA1 hash.
     fn hash_piece(&self, index: usize) -> Result<[u8; 20]> {
+        if index >= self.num_pieces {
+            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+        }
+
         let mut hash: [u8; 20] = [0; 20];
         let mut hasher = Sha1::new();
         if self.is_piece_finished(index)? == true {
@@ -182,6 +212,10 @@ impl OutputFile {
     }
 
     pub fn is_block_finished(&self, index: usize, begin: usize) -> Option<bool> {
+        if index >= self.num_pieces {
+            return None;
+        }
+        // This handles if index or begin is too large.
         self.blocks[index]
             .get(begin.div_ceil(BLOCK_SIZE))
             .as_deref()
@@ -190,6 +224,10 @@ impl OutputFile {
 
     /// Check to see if the piece was finished.
     fn is_piece_finished(&self, index: usize) -> Result<bool> {
+        if index >= self.num_pieces {
+            return Err(Error::msg("Index greater than or equal to the number of pieces!"));
+        }
+
         let bound = if index == self.num_pieces - 1 {
             self.last_piece_size
         } else {
@@ -216,11 +254,18 @@ mod test {
     #[ignore]
     fn test_general() {
         let filename = "file.rs.test_general.output";
+        let filesize = 23;
+        let blocksize = 1;
         let _ = fs::remove_file(filename);
-        let mut test_file = OutputFile::new(filename, 50, 5, 10).unwrap();
-        // Write some data.
-        _ = test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd']));
-        _ = test_file.write_block(1, 0, Vec::from([b'x', b'y', b'z']));
+        // This results in an output file with 4 5-byte pieces and one 3-byte piece.
+        let mut test_file = OutputFile::new(filename, filesize, 5, 5, 1).unwrap();
+        // Write some data. MUST FILL PIECE OR READ WILL FAIL.
+        _ = test_file.write_block(0, 0, Vec::from([b'a', b'b', b'c', b'd', b'e']));
+        _ = test_file.write_block(1, 0, Vec::from([b'x', b'y', b'z', b't', b'v']));
+        assert_eq!(test_file.is_piece_finished(0).unwrap(), true);
+        test_file.set_piece_finished(0);
+        assert_eq!(test_file.is_piece_finished(1).unwrap(), true);
+        test_file.set_piece_finished(1);
         // See if that data reads back.
         let test = test_file.read_block(0, 0, 4).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
@@ -229,26 +274,28 @@ mod test {
         dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b'x', b'y', b'z']));
         // Write some more data, this time at an offset. And read it back.
-        _ = test_file.write_block(0, 5, Vec::from([b't', b'v']));
-        let test = test_file.read_block(0, 5, 2).unwrap();
+        _ = test_file.write_block(0, 3, Vec::from([b't', b'v']));
+        let test = test_file.read_block(0, 3, 2).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b't', b'v']));
-        // Write data up to the very end of the params
-        _ = test_file.write_block(4, 8, Vec::from([b'a', b'b']));
-        let test = test_file.read_block(4, 8, 2).unwrap();
+        // Write data up to the very end of the last piece
+        _ = test_file.write_block(4, 0, Vec::from([b'a', b'b', b'c']));
+        assert_eq!(test_file.is_piece_finished(4).unwrap(), true);
+        test_file.set_piece_finished(4);
+        let test = test_file.read_block(4, 0, 3).unwrap();
         dbg!(&std::str::from_utf8(&test).unwrap());
-        assert_eq!(test, Vec::from([b'a', b'b']));
+        assert_eq!(test, Vec::from([b'a', b'b', b'c']));
 
         // Make sure that the file is the expected size.
         let metadata = fs::metadata(filename).unwrap();
-        assert_eq!(50, metadata.len());
+        assert_eq!(23, metadata.len());
     }
 
     #[test]
     fn test_write_fail() {
         let filename = "file.rs.test_write_fail.output";
         let _ = fs::remove_file(filename);
-        let mut test_file = OutputFile::new(filename, 50, 5, 10).unwrap();
+        let mut test_file = OutputFile::new(filename, 50, 5, 10, 1).unwrap();
         // Write to bounds of file and file pieces. Expect errors.
         assert!(test_file.write_block(5, 0, Vec::from([b'a'])).is_err());
         assert!(test_file.write_block(0, 10, Vec::new()).is_err());
@@ -275,7 +322,7 @@ mod test {
     fn test_read_fail() {
         let filename = "file.rs.test_read_fail.output";
         let _ = fs::remove_file(filename);
-        let mut test_file = OutputFile::new(filename, 50, 5, 10).unwrap();
+        let mut test_file = OutputFile::new(filename, 50, 5, 10, 1).unwrap();
         // Read to bounds of file and file pieces.
         // Reading past end of piece.
         assert!(test_file.read_block(0, 9, 1).is_ok());
@@ -305,8 +352,8 @@ mod test {
         let _ = fs::remove_file(filename);
         let num_pieces = 5;
         let piece_size = 10;
-        let mut test_file =
-            OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
+        let block_size = 1;
+        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
 
         // Check to make sure that the BitVec intialized as expected.
         assert_eq!(test_file.bytes.len(), num_pieces);
@@ -377,8 +424,13 @@ mod test {
         let _ = fs::remove_file(filename);
         let num_pieces = 2;
         let piece_size = 5;
+<<<<<<< HEAD
         let mut test_file =
             OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
+=======
+        let block_size = 1;
+        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
+>>>>>>> e17973f (Improved API and changed some test)
 
         // Write a piece "abcde".
         assert_eq!(
@@ -418,6 +470,21 @@ mod test {
                 .unwrap(),
             false
         );
+    }
+
+    #[test]
+    fn test_bitvec_part_2() {}
+
+    #[test]
+    fn test_helper_methods() {
+        let filename = "file.rs.helper.output";
+        let _ = fs::remove_file(filename);
+        let num_pieces = 2;
+        let piece_size = 5;
+        let block_size = 1;
+        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size, block_size).unwrap();
+        
+        let bv:BitVec<u8, Msb0> = BitVec::from_bitslice(bits![u8, Msb0; 0, 1, 0, 1, 0, 0, 1, 1, 1]);
     }
 
     #[test]
