@@ -88,7 +88,7 @@ impl Strategy {
             // see if we can do anything with the pieces that the peer has
             for &piece in &self.focused_pieces {
                 // the peer says they have the piece we want 🧩
-                if peer.check_piece_bitfield(piece).unwrap() {
+                if let Some(true) = peer.check_piece_bitfield(piece) {
                     // but they are choking us :(((( 🐒
                     if peer.peer_choking {
                         peer.get_mut_messages()
