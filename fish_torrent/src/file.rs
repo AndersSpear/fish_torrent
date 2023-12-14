@@ -70,6 +70,10 @@ impl OutputFile {
     pub fn get_file_length(&self) -> usize {
         self.length
     }
+    
+    pub fn get_num_pieces(&self) -> usize {
+        self.num_pieces
+    }
 
     pub fn get_file_bitfield(&self) -> BitVec<u8, Msb0> {
         self.pieces.clone()
