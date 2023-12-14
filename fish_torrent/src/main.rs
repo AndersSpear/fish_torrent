@@ -22,6 +22,8 @@ use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::{Duration, Instant};
 use url::Url;
+use rand::{Rng, thread_rng};
+use rand::distributions::{Alphanumeric, DistString};
 
 use crate::file::OutputFile;
 use crate::p2p::MessageType;
@@ -62,7 +64,7 @@ fn main() {
     // things i own :)
     let mut self_info = SelfInfo {
         tracker_id: [0; 20],
-        peer_id: [0; 20], // TODO make peerid not zero :D
+        peer_id: create_peer_id(),
         port: args.port,
         uploaded: 0,
         downloaded: 0,
@@ -94,6 +96,7 @@ fn main() {
 
     let mut output_file = OutputFile::new(
         get_file_name(),
+        get_file_length().try_into().unwrap(),
         get_number_of_pieces().try_into().unwrap(),
         get_piece_length().try_into().unwrap(),
     )
@@ -101,7 +104,7 @@ fn main() {
 
     // parse that url and open the initial socket
     // this blocks because wth are you gonna do while you wait for a response
-    println!("{}", get_tracker_url());
+    dbg!(get_tracker_url());
     // let mut tracker_sock = TcpStream::from_std(
     //     std::net::TcpStream::connect(
     //         *Url::parse(get_tracker_url())
@@ -379,6 +382,7 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
     dbg!(format!("handling peer {:?}", peer));
     p2p::handle_messages(peer).expect("failed to read message"); // TOOD: shout at anders this funtion doesnt work properly (read_to_end)
                                                                  // TODO: should remove peer if error reading? (question mark?)
+    // 
     let messages = peer.messages.messages.clone();
 
     for msg in messages {
@@ -399,7 +403,8 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
             MessageType::Have { index } => {
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
-            MessageType::Bitfield { field } => {
+            MessageType::Bitfield { mut field } => {
+                let _ = field.drain(field.len() - (output_file.get_file_length()%8)..);
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request {
@@ -441,5 +446,46 @@ fn handle_peer(peer: &mut Peer, output_file: &mut OutputFile) {
               //     // do i care?
               // }
         }
+    }
+}
+
+fn create_peer_id() -> [u8; 20] {
+    let my_peer_id = Alphanumeric.sample_string(&mut rand::thread_rng(), 20);
+    dbg!(&my_peer_id);
+    my_peer_id.into_bytes().try_into().unwrap()
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use mio::net::{TcpListener, TcpStream};
+    use std::io::{Read, Write};
+    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+    #[test]
+    fn test_peer_get_socket() {
+        // Set up networking.
+        let (self_sock, mut other_sock) = networking_setup(8000);
+
+        // Create a peer, give it the TcpStream, and then see if the stream
+        // can be written to and read from.
+        let mut peer = Peer::new(self_sock);
+        let get_sock = peer.get_mut_socket();
+
+        // Write
+        let string = b"test";
+        dbg!(get_sock.write(string).unwrap());
+        let mut buf: [u8; 4] = [0; 4];
+        dbg!(other_sock.read(&mut buf).unwrap());
+        dbg!(std::str::from_utf8(&buf).unwrap());
+        assert_eq!(string, &buf);
+
+        // Read
+        let string = b"helo";
+        dbg!(other_sock.write(string).unwrap());
+        dbg!(get_sock.read(&mut buf).unwrap());
+        dbg!(std::str::from_utf8(&buf).unwrap());
+        assert_eq!(string, &buf);
     }
 }
