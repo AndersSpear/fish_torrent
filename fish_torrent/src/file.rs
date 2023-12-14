@@ -11,6 +11,8 @@ use sha1::{Digest, Sha1};
 
 use anyhow::{Error, Result};
 
+const BLOCK_SIZE: usize = 16000; //bytes
+
 pub struct OutputFile {
     file: File,
     length: usize,
@@ -82,7 +84,7 @@ impl OutputFile {
             Err(Error::msg("index was larger than or equal to num_pieces!"))
         } else if (begin + block.len()) > self.piece_size {
             Err(Error::msg("begin + block len was larger than piece size!"))
-        } else if index == num_pieces - 1 && begin + block.len() > self.last_piece_size {
+        } else if index == self.num_pieces - 1 && begin + block.len() > self.last_piece_size {
             Err(Error::msg(
                 "begin + block len was larger than last piece size!",
             ))
@@ -99,6 +101,7 @@ impl OutputFile {
                 self.bytes[index].set(i, true);
             }
 
+            self.blocks[index].set(begin / BLOCK_SIZE, true); //NOTE: Sus
             let finished = self.is_piece_finished(index)?;
             if finished == true {
                 self.pieces.set(index, true);
@@ -117,13 +120,15 @@ impl OutputFile {
 
         if index >= self.num_pieces {
             Err(Error::msg("index was larger than or equal to num_pieces!"))
+        } else if self.pieces[index] == false {
+            Err(Error::msg("index to be read was not yet finished!"))
         } else if begin + length > self.piece_size {
             // This math is a little confusing--begin is an index but length is not,
             // so a >= would cause a false error.
             // Ex. num_pieces 5 piece_size 10
             // index 4 begin 5 length 5. This should be valid because we start writing at the 5th index.
             Err(Error::msg("begin + length was larger than piece size!"))
-        } else if index == num_pieces - 1 && begin + block.len() > self.last_piece_size {
+        } else if index == self.num_pieces - 1 && begin + length > self.last_piece_size {
             Err(Error::msg(
                 "begin + length was larger than last piece size!",
             ))
@@ -170,7 +175,12 @@ impl OutputFile {
 
     /// Check to see if the piece was finished.
     fn is_piece_finished(&self, index: usize) -> Result<bool> {
-        for i in 0..self.piece_size {
+        let bound = if index == self.num_pieces - 1 {
+                        self.last_piece_size
+                    } else {
+                        self.piece_size
+                    };
+        for i in 0..bound {
             let &bit = self.bytes[index].get(i).as_deref().expect(
                 "Unknown edge case where OutputFile.pieces was not
                 properly initialized or bounds were not properly checked.",
@@ -390,5 +400,10 @@ mod test {
                 .unwrap(),
             false
         );
+    }
+
+    #[test]
+    fn test_last_piece() {
+
     }
 }
