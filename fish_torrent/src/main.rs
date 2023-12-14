@@ -445,7 +445,7 @@ fn create_peer_id() -> [u8; 20] {
 #[cfg(test)]
 mod test {
     use super::*;
-    use bitvec::{order::Msb0, vec::BitVec, bits};
+    use bitvec::{bits, order::Msb0, vec::BitVec};
 
     #[test]
     #[ignore]
@@ -483,8 +483,9 @@ mod test {
         let num_pieces = 10;
         let correct_field = BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 1, 1, 0, 1, 1, 0, 1, 1]);
 
-        let mut field = BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0]);
-        
+        let mut field =
+            BitVec::from_bitslice(bits![u8, Msb0; 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0]);
+
         assert_eq!(field.len(), 16);
         let _ = field.drain(field.len() - (8 - (num_pieces % 8))..);
         dbg!(&field);

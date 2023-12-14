@@ -305,7 +305,8 @@ mod test {
         let _ = fs::remove_file(filename);
         let num_pieces = 5;
         let piece_size = 10;
-        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
+        let mut test_file =
+            OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
 
         // Check to make sure that the BitVec intialized as expected.
         assert_eq!(test_file.bytes.len(), num_pieces);
@@ -376,7 +377,8 @@ mod test {
         let _ = fs::remove_file(filename);
         let num_pieces = 2;
         let piece_size = 5;
-        let mut test_file = OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
+        let mut test_file =
+            OutputFile::new(filename, num_pieces * piece_size, num_pieces, piece_size).unwrap();
 
         // Write a piece "abcde".
         assert_eq!(

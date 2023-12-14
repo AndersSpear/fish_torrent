@@ -145,6 +145,15 @@ impl Strategy {
                 });
             }
 
+            // unchoke all the peers 🐒
+            // what is the point of choking 🐒
+            // we want pieces 🐒
+            if peer.am_choking {
+                peer.get_mut_messages().messages.push(MessageType::Unchoke);
+
+                peer.am_choking = false;
+            }
+
             // For every focused piece
             // Does peer have what I want?
             // If so, are we unchoked?
