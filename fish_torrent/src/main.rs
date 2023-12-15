@@ -4,6 +4,7 @@
 #![allow(unused_imports)]
 #![allow(unreachable_code)]
 #![warn(missing_docs)]
+#![feature(duration_constants)]
 //! handles initial call to tracker and peer
 //! handles epoll event loop
 //! triggers peer tracker, p2p, strategy, on a timer
@@ -26,6 +27,7 @@ use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::{Duration, Instant};
 use url::Url;
+use indicatif::ProgressBar;
 
 use crate::file::OutputFile;
 use crate::p2p::{MessageType, Messages};
@@ -109,6 +111,9 @@ impl Timers {
 fn main() {
     // you'll never guess what this line does
     let args = Args::parse();
+
+    let mut bar =  ProgressBar::new_spinner();
+    bar.with_message("Communicating with tracker").enable_steady_tick(Duration::SECOND);
 
     // Initialize structs and data.
     let mut self_info = SelfInfo {
