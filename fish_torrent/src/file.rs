@@ -68,8 +68,8 @@ impl OutputFile {
                 bytes: vec![bitvec![u8, Msb0; 0; piece_size]; num_pieces],
                 blocks: vec![bitvec![u8, Msb0; 0; piece_size.div_ceil(block_size)]; num_pieces],
                 pieces: bitvec![u8, Msb0; 0; num_pieces],
-                bytes_recvd:0,
-                bytes_sent:0,
+                bytes_recvd: 0,
+                bytes_sent: 0,
             })
         } else {
             None
@@ -148,8 +148,8 @@ impl OutputFile {
             //    self.pieces.set(index, true);
             //}
 
-                self.bytes_recvd += block.len();
-                dbg!(self.bytes_recvd);
+            self.bytes_recvd += block.len();
+            dbg!(self.bytes_recvd);
 
             Ok(finished)
         }
@@ -184,7 +184,7 @@ impl OutputFile {
             if length != res {
                 panic!("This should not have occurred. Inform Tien.")
             }
-            
+
             Ok(buf)
         }
     }
