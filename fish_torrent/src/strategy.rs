@@ -24,7 +24,7 @@ pub struct Update {
 
 #[derive(PartialEq)]
 pub struct Request {
-    peer_addr: SocketAddr,
+    // peer_addr: SocketAddr,
     index: usize,
     begin: usize,
     length: usize,
@@ -147,7 +147,6 @@ impl Strategy {
                         while i < file.get_piece_size(piece)
                             && (file.is_block_finished(piece, i).unwrap()
                                 || self.rqs.contains(&Request {
-                                    peer_addr: *addr,
                                     index: piece,
                                     begin: i,
                                     length: BLOCK_SIZE,
@@ -172,7 +171,7 @@ impl Strategy {
                                 length: block_len,
                             });
                             self.rqs.push(Request {
-                                peer_addr: *addr,
+                                // peer_addr: *addr,
                                 index: piece,
                                 begin: i,
                                 length: BLOCK_SIZE,

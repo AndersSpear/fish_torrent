@@ -28,15 +28,15 @@ use std::time::{Duration, Instant};
 use url::Url;
 
 use crate::file::OutputFile;
-use crate::p2p::MessageType;
+use crate::p2p::{MessageType, Messages};
 use crate::peers::Peers;
 use crate::strategy::{Strategy, Update};
 use crate::torrent::*;
 use crate::tracker::*;
 
 const STRATEGY_TIMEOUT: Duration = Duration::new(0, 500000000); // 100 milliseconds TODO: change back to .1 sec
-const KEEPALIVE_TIMEOUT: Duration = Duration::new(10, 0); // 2 minutes because T H E S P E C
-const CLEAR_REQUESTS_TIMEOUT: Duration = Duration::new(30, 0); // 2 minutes because T H E S P E C
+const KEEPALIVE_TIMEOUT: Duration = Duration::new(60, 0); // 2 minutes because T H E S P E C
+const CLEAR_REQUESTS_TIMEOUT: Duration = Duration::new(30, 0); // uh retry after like 3 minutes idk
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -224,7 +224,25 @@ fn main() {
             println!(" === Strategy Timeout === ");
 
             strategy_state.what_do(&mut peer_list, &mut output_file);
-            p2p::send_all(&mut peer_list).expect("failed to send all");
+            // if let Err(e) = p2p::send_all(&mut peer_list) {
+            //     println!("failed to send to peer");
+            //     dbg!()
+            // }
+            let mut to_disconnect = Vec::new();
+            for (&peer_addr, peer) in peer_list.get_peers_list() {
+                let msgs = peer.messages.clone();
+                peer.messages = Messages::new();
+                if let Err(e) = msgs.send_messages(peer.get_mut_socket()) {
+                    dbg!(e);
+                    println!("Failed to send to peer, dropping...");
+                    to_disconnect.push(peer_addr);
+                }
+            }
+            // disconnect any failed peers
+            for peer_addr in to_disconnect {
+                let token = find_token_by_peer(peer_addr, &sockets).unwrap();
+                disconnect_peer(&mut poll, &mut peer_list, &mut sockets, token);
+            }
 
             timers.strategy.update_instant();
         }
@@ -421,7 +439,6 @@ fn main() {
 fn disconnect_peer(poll: &mut Poll, peer_list: &mut Peers, sockets: &mut HashMap<Token, SocketAddr>, token: Token) {
     let peer_addr = sockets.remove(&token).unwrap();
     let mut peer = peer_list.remove_peer(peer_addr).unwrap();
-    dbg!(&peer);
     match poll.registry().deregister(peer.get_mut_socket()) {
         Ok(_) => {
             println!("Successfully removed peer from poll!");
@@ -476,6 +493,16 @@ fn add_all_peers(
 fn get_new_token() -> Token {
     static TOKEN_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(2);
     Token(TOKEN_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+}
+
+fn find_token_by_peer(peer_addr: SocketAddr, sockets: &HashMap<Token, SocketAddr>) -> Option<Token> {
+    for (&token, addr) in sockets {
+        if peer_addr == *addr {
+            return Some(token);
+        }
+    }
+
+    None
 }
 
 /// Handles the message received from a peer.

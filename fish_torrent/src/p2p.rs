@@ -79,7 +79,7 @@ impl Messages {
 
     /// can handle sending any type of message
     /// queues in some sort of send list
-    fn send_messages(self, sock: &mut TcpStream) -> Result<(), Error> {
+    pub fn send_messages(self, sock: &mut TcpStream) -> Result<(), Error> {
         // <length prefix><message ID><payload>
         // 4 bytes        1 byte      ? bytes
 
