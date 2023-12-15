@@ -187,9 +187,12 @@ impl Strategy {
                     index: req.index.try_into().unwrap(),
                     begin: req.begin.try_into().unwrap(),
                     block: file
-                        .read_block(req.index, req.begin, BLOCK_SIZE)
+                        .read_block(req.index, req.begin, req.length)
                         .expect("could not get block"),
                 });
+
+                //todo write sent bytes len
+                //file.bytes_sent += req.length;
             }
 
             // unchoke all the peers 🐒

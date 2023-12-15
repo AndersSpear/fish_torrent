@@ -557,7 +557,7 @@ fn handle_peer(
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
             MessageType::Bitfield { mut field } => {
-                let _ = field.drain(field.len() - ((8 - (output_file.get_num_pieces() % 8)) % 8)..);
+                let _ = field.drain(field.len() - (8 - (output_file.get_num_pieces() % 8))..);
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request {
