@@ -78,6 +78,7 @@ impl OutputFile {
 
     pub fn get_num_pieces(&self) -> usize {
         self.num_pieces
+        //self.pieces.len()
     }
 
     pub fn get_piece_size(&self, index: usize) -> usize {
@@ -129,7 +130,7 @@ impl OutputFile {
             // Write to file at specified location.
             self.file
                 .write_at(&block, ((index * self.piece_size) + begin).try_into()?)?;
-            self.file.flush()?;
+            //self.file.flush()?;
 
             // Record the bytes written in pieces.
             for i in begin..(begin + block.len()) {
@@ -184,6 +185,10 @@ impl OutputFile {
             return Err(Error::msg(
                 "Index greater than or equal to the number of pieces!",
             ));
+        }
+
+        for i in 0..self.bytes[index].len() {
+            self.bytes[index].set(i, false);
         }
 
         for i in 0..self.blocks[index].len() {
