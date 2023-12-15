@@ -76,6 +76,36 @@ impl OutputFile {
         }
     }
 
+    /// Only used when you start in seeder mode.
+    /// Assumes the file is already complete, and initializes based on that assumption.
+    pub fn new_seeder(
+        name: &str,
+        length: usize,
+        num_pieces: usize,
+        piece_size: usize,
+        block_size: usize,
+    ) -> Option<Self> {
+        let file = OpenOptions::new().read(true).open(name).ok();
+
+        if let Some(file) = file {
+            Some(OutputFile {
+                file,
+                length,
+                block_size,
+                num_pieces,
+                piece_size,
+                last_piece_size: length - ((num_pieces - 1) * piece_size),
+                bytes: vec![bitvec![u8, Msb0; 1; piece_size]; num_pieces],
+                blocks: vec![bitvec![u8, Msb0; 1; piece_size.div_ceil(block_size)]; num_pieces],
+                pieces: bitvec![u8, Msb0; 1; num_pieces],
+                bytes_recvd: 0,
+                bytes_sent: 0,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn get_file_length(&self) -> usize {
         self.length
     }

@@ -35,8 +35,8 @@ use crate::torrent::*;
 use crate::tracker::*;
 
 const STRATEGY_TIMEOUT: Duration = Duration::new(0, 100000000); // 100 milliseconds TODO: change back to .1 sec
-const KEEPALIVE_TIMEOUT: Duration = Duration::new(60, 0); // 2 minutes because T H E S P E C
-const CLEAR_REQUESTS_TIMEOUT: Duration = Duration::new(30, 0); // uh retry after like 3 minutes idk
+const KEEPALIVE_TIMEOUT: Duration = Duration::new(120, 0); // 2 minutes because T H E S P E C
+const CLEAR_REQUESTS_TIMEOUT: Duration = Duration::new(30, 0); // uh retry after like 30 sec idk
 
 // Takes in the port and torrent file
 #[derive(Parser, Debug)]
@@ -57,6 +57,14 @@ struct Args {
     /// Peer port you want to connect to (optional)
     #[arg(short, long, default_value_t = 0)]
     peer_port: u16,
+
+    /// Do you want to start as a seeder? (optional, but if enabled must have full file)
+    #[arg(short, long, default_value_t = false)]
+    seeder: bool,
+
+    /// Completed file used for seeding, must be specified if seeder enabled
+    #[arg(short, long, default_value = "")]
+    seeder_file: String,
 }
 
 struct SelfInfo {
@@ -152,14 +160,37 @@ fn main() {
     parse_torrent_file(&args.file);
 
     // Initialize output file using info from torrent file.
-    let mut output_file = OutputFile::new(
-        get_file_name(),
-        get_file_length().try_into().unwrap(),
-        get_number_of_pieces().try_into().unwrap(),
-        get_piece_length().try_into().unwrap(),
-        file::BLOCK_SIZE,
-    )
-    .unwrap();
+    let mut output_file = if args.seeder {
+        // try to open the file to seed, panic if it doesnt work (give me the correct file >:()
+        let tmp_file = OutputFile::new_seeder(
+            &args.seeder_file,
+            get_file_length().try_into().unwrap(),
+            get_number_of_pieces().try_into().unwrap(),
+            get_piece_length().try_into().unwrap(),
+            file::BLOCK_SIZE,
+        )
+        .unwrap();
+        
+        // TODO: i dont think this hashes properly but i have no idea why so just give it the right file the first time :)
+        for piece in 0..get_number_of_pieces() {
+            if let Err(e) = tmp_file.compare_piece_hash(piece as usize, &get_piece_hash(piece as usize).expect("failed to get piece hash")) {
+                dbg!(e);
+                println!("Hash failed to hash! Not the correct file to seed >:(!!");
+                panic!();
+            }
+        }
+
+        tmp_file
+    } else {
+        OutputFile::new(
+            get_file_name(),
+            get_file_length().try_into().unwrap(),
+            get_number_of_pieces().try_into().unwrap(),
+            get_piece_length().try_into().unwrap(),
+            file::BLOCK_SIZE,
+        )
+        .unwrap()
+    };
 
     // Initialize strategy state.
     let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 500); // TODO make not 5
@@ -210,7 +241,10 @@ fn main() {
     // OPTIONAL DIRECT CONNECTION TO PEER
     if args.peer_addr != "" && args.peer_port != 0 {
         dbg!("Direct connect");
-        let peer_addr = SocketAddr::V4(SocketAddrV4::new(args.peer_addr.parse().unwrap(), args.peer_port));
+        let peer_addr = SocketAddr::V4(SocketAddrV4::new(
+            args.peer_addr.parse().unwrap(),
+            args.peer_port,
+        ));
         let socket = TcpStream::connect(peer_addr).unwrap();
         let peer = peer_list.add_peer(peer_addr, socket, None).unwrap();
         let token = get_new_token();
@@ -232,7 +266,7 @@ fn main() {
             output_file.get_file_bitfield().count_ones(),
             output_file.get_num_pieces()
         );
-        if output_file.is_file_finished() {
+        if output_file.is_file_finished() && !args.seeder {
             println!(
                 "🦀🦀🦀🦀 You have downloaded {} successfully!! Congrats!!! 🦀🦀🦀🦀",
                 get_file_name()
@@ -263,12 +297,14 @@ fn main() {
             // }
             let mut to_disconnect = Vec::new();
             for (&peer_addr, peer) in peer_list.get_peers_list() {
-                let msgs = peer.messages.clone();
-                peer.messages = Messages::new();
-                if let Err(e) = msgs.send_messages(peer.get_mut_socket()) {
-                    dbg!(e);
-                    println!("Failed to send to peer, dropping...");
-                    to_disconnect.push(peer_addr);
+                if peer.handshook {
+                    let msgs = peer.messages.clone();
+                    peer.messages = Messages::new();
+                    if let Err(e) = msgs.send_messages(peer.get_mut_socket()) {
+                        dbg!(e);
+                        println!("Failed to send to peer, dropping...");
+                        to_disconnect.push(peer_addr);
+                    }
                 }
             }
             // disconnect any failed peers;
@@ -405,8 +441,10 @@ fn main() {
                                 .unwrap()
                                 .to_string(),
                         );
-                        send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
 
+                        if !args.seeder && args.peer_port == 0 {
+                            send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
+                        }
                         // Register the socket for reading response.
                         poll.registry()
                             .reregister(&mut tracker_sock, TRACKER, Interest::READABLE)
@@ -444,6 +482,19 @@ fn main() {
                             if event.is_readable() {
                                 println!("- Received handshake from peer {:?} -", &peer_addr);
                                 if let Ok(peer_id) = p2p::recv_handshake(peer.get_mut_socket()) {
+                                    // it wont be writable again because edge triggered so uh need to check now!
+                                    if event.is_writable() {
+                                        println!("- Sent handshake to peer {:?} -", &peer_addr);
+                                        p2p::send_handshake(peer, &self_info.peer_id, &output_file)
+                                            .expect("failed to send handshake");
+
+                                        peer.handshook = true;
+                                        // only care about readable events from now on
+                                        poll.registry()
+                                            .reregister(peer.get_mut_socket(), token, Interest::READABLE)
+                                            .expect("peer rereg fail");
+                                    }
+                                    // this happens after the writable check because borrow check :)
                                     peer_list
                                         .complete_peer(peer_addr, &peer_id.try_into().unwrap())
                                         .unwrap();
@@ -457,6 +508,8 @@ fn main() {
                                 println!("- Sent handshake to peer {:?} -", &peer_addr);
                                 p2p::send_handshake(peer, &self_info.peer_id, &output_file)
                                     .expect("failed to send handshake");
+
+                                peer.handshook = true;
                                 // only care about readable events from now on
                                 poll.registry()
                                     .reregister(peer.get_mut_socket(), token, Interest::READABLE)
@@ -604,7 +657,9 @@ fn handle_peer(
                 block,
             } => {
                 // we dont already have the piece right? RIGHT?
-                if let Some(true) = output_file.is_block_finished(index.try_into().unwrap(), begin.try_into().unwrap()) {
+                if let Some(true) = output_file
+                    .is_block_finished(index.try_into().unwrap(), begin.try_into().unwrap())
+                {
                     continue;
                 }
                 // did we finish the piece?
@@ -624,7 +679,7 @@ fn handle_peer(
                         output_file
                             .set_piece_finished(index.try_into().unwrap())
                             .expect("failed to set piece to finished");
-                        strategy_state.rm_requests_for_piece(index.try_into().unwrap());
+                        strategy_state.rm_requests_for_piece(index.try_into().unwrap()); // TODO: should send cancels maybe?
                         // if so, we can push the update that we have completed a piece !!
                         strategy_state
                             .push_update(Some(peer_addr), MessageType::Have { index: index });

@@ -38,6 +38,7 @@ pub struct Peer {
     piece_requests: Vec<Request>,     // what pieces they said they want
     pub recv_buffer: Vec<u8>,
     pub messages: Messages,
+    pub handshook: bool,
 }
 
 impl Peer {
@@ -53,6 +54,7 @@ impl Peer {
             piece_requests: Vec::new(),
             recv_buffer: Vec::new(),
             messages: Messages::new(),
+            handshook: false,
         }
     }
 
