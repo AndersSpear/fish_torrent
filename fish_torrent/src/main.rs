@@ -557,7 +557,7 @@ fn handle_peer(
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
             MessageType::Bitfield { mut field } => {
-                let _ = field.drain(field.len() - (8 - (output_file.get_num_pieces() % 8))..);
+                let _ = field.drain(field.len() - ((8 - (output_file.get_num_pieces() % 8)) % 8)..);
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request {
@@ -665,7 +665,7 @@ mod test {
 
         // should make bitvec [1, 0, 1]
         assert_eq!(field.len(), 8);
-        let _ = field.drain(field.len() - (8 - (num_pieces % 8))..);
+        let _ = field.drain(field.len() - ((8 - (num_pieces % 8)) % 8)..);
         dbg!(&field);
         dbg!(&correct_field);
         assert_eq!(field.len(), num_pieces);
