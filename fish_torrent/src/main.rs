@@ -95,7 +95,7 @@ impl Timers {
 
         let mut min_remaining: Duration = Duration::new(std::u64::MAX, 0);
         for timer in all_timers {
-            let remaining = timer.timeout - timer.instant.elapsed();
+            let remaining = timer.timeout.saturating_sub(timer.instant.elapsed());
             if remaining < min_remaining {
                 min_remaining = remaining;
             }
