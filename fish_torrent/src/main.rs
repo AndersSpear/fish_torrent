@@ -34,7 +34,7 @@ use crate::strategy::{Strategy, Update};
 use crate::torrent::*;
 use crate::tracker::*;
 
-const STRATEGY_TIMEOUT: Duration = Duration::new(0, 500000000); // 100 milliseconds TODO: change back to .1 sec
+const STRATEGY_TIMEOUT: Duration = Duration::new(0, 100000000); // 100 milliseconds TODO: change back to .1 sec
 const KEEPALIVE_TIMEOUT: Duration = Duration::new(60, 0); // 2 minutes because T H E S P E C
 const CLEAR_REQUESTS_TIMEOUT: Duration = Duration::new(30, 0); // uh retry after like 3 minutes idk
 
@@ -154,7 +154,7 @@ fn main() {
     .unwrap();
 
     // Initialize strategy state.
-    let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 100); // TODO make not 5
+    let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 500); // TODO make not 5
 
     // Holds the partially read data from a tracker response.
     let mut partial_tracker_data = Vec::new();
@@ -285,7 +285,7 @@ fn main() {
 
         // For every event...
         for event in &events {
-            println!("Event llopp with event {:?}", event);
+            println!("- Event llopp with {:?} -", event);
             // See if the event is associated with listening socket, tracker, or peers.
             match event.token() {
                 SERVER => {
@@ -536,7 +536,7 @@ fn handle_peer(
 
     for msg in messages {
         if let MessageType::Piece { index, begin, .. } = msg {
-            println!("Message is Piece with index {} and begin {}", index, begin);
+            //println!("Message is Piece with index {} and begin {}", index, begin);
         } else {
             println!("Message is {:?}", msg);
         }
@@ -557,7 +557,7 @@ fn handle_peer(
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
             MessageType::Bitfield { mut field } => {
-                let _ = field.drain(field.len() - (8 - (output_file.get_num_pieces() % 8))..);
+                let _ = field.drain(field.len() - ((8 - (output_file.get_num_pieces() % 8)) % 8)..);
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request {
