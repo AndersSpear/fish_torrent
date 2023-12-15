@@ -18,6 +18,7 @@ mod tracker;
 
 use anyhow::Error;
 use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token};
 use peers::Peer;
@@ -27,7 +28,6 @@ use std::collections::HashMap;
 use std::net::{self, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::{Duration, Instant};
 use url::Url;
-use indicatif::ProgressBar;
 
 use crate::file::OutputFile;
 use crate::p2p::{MessageType, Messages};
@@ -112,8 +112,8 @@ fn main() {
     // you'll never guess what this line does
     let args = Args::parse();
 
-    let mut bar =  ProgressBar::new_spinner();
-    bar.with_message("Communicating with tracker").enable_steady_tick(Duration::SECOND);
+    let mut bar = ProgressBar::new_spinner().with_message("Communicating with tracker");
+    bar.enable_steady_tick(Duration::SECOND);
 
     // Initialize structs and data.
     let mut self_info = SelfInfo {
@@ -350,6 +350,11 @@ fn main() {
                             // started to periodic.
                             if self_info.tracker_event == Event::STARTED {
                                 self_info.tracker_event = Event::PERIODIC;
+                                bar.finish_with_message("Recieved data from tracker");
+                                let barstyle = ProgressStyle::with_template("[{elapsed}] {wide_bar:.cyan/blue} {bytes_per_sec} {bytes} {total_bytes} {msg}").unwrap();
+                                bar = ProgressBar::new(output_file.get_file_length() as u64);
+                                bar.set_style(barstyle);
+                                bar.tick();
                             }
 
                             // Deregister tracker socket, as response means connection is no longer needed.
@@ -445,6 +450,8 @@ fn main() {
                     } else {
                         println!("there is no socket associated with token {:?}", token);
                     }
+                    //bar.set_position(output_file.get_num_bytes_written() as u64);
+                    bar.set_position(390);
                 }
             }
         }
@@ -583,7 +590,9 @@ fn handle_peer(
                 block,
             } => {
                 // we dont already have the piece right? RIGHT?
-                if let Some(true) = output_file.is_block_finished(index.try_into().unwrap(), begin.try_into().unwrap()) {
+                if let Some(true) = output_file
+                    .is_block_finished(index.try_into().unwrap(), begin.try_into().unwrap())
+                {
                     continue;
                 }
                 // did we finish the piece?
