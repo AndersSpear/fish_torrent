@@ -49,6 +49,14 @@ struct Args {
     /// Torrent file you wish to parse
     #[arg(short, long)]
     file: String,
+
+    /// Peer address you want to connect to (optional)
+    #[arg(short, long, default_value = "")]
+    peer_addr: String,
+
+    /// Peer port you want to connect to (optional)
+    #[arg(short, long, default_value_t = 0)]
+    peer_port: u16,
 }
 
 struct SelfInfo {
@@ -199,6 +207,24 @@ fn main() {
         },
     };
 
+    // OPTIONAL DIRECT CONNECTION TO PEER
+    if args.peer_addr != "" && args.peer_port != 0 {
+        dbg!("Direct connect");
+        let peer_addr = SocketAddr::V4(SocketAddrV4::new(args.peer_addr.parse().unwrap(), args.peer_port));
+        let socket = TcpStream::connect(peer_addr).unwrap();
+        let peer = peer_list.add_peer(peer_addr, socket, None).unwrap();
+        let token = get_new_token();
+        poll.registry()
+            .register(
+                peer.get_mut_socket(),
+                token,
+                Interest::WRITABLE | Interest::READABLE,
+            )
+            .expect(&format!("failed to register peer {:?}", peer_addr));
+        sockets.insert(token, peer_addr);
+        println!("- Syn'd and added peer {:?} with {:?} -", peer_addr, token);
+    }
+
     loop {
         // check if you have downloaded the file
         println!(
@@ -245,7 +271,7 @@ fn main() {
                     to_disconnect.push(peer_addr);
                 }
             }
-            // disconnect any failed peers
+            // disconnect any failed peers;
             for peer_addr in to_disconnect {
                 let token = find_token_by_peer(peer_addr, &sockets).unwrap();
                 disconnect_peer(&mut poll, &mut peer_list, &mut sockets, token);
