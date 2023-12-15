@@ -161,7 +161,7 @@ impl Strategy {
                             // should send the next block we want to request for that piece
                             let mut block_len: u32 = BLOCK_SIZE.try_into().unwrap();
                             if file.get_piece_size(piece) - i < BLOCK_SIZE {
-                                dbg!("we are here");
+                                //COMMENTEDFORBAR dbg!("we are here");
                                 block_len = (file.get_piece_size(piece) % BLOCK_SIZE) as u32;
                             }
 

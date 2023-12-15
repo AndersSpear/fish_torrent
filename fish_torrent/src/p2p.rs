@@ -61,7 +61,7 @@ pub enum MessageType {
 
 /// sends all messages in the peers struct
 pub fn send_all(peers: &mut Peers) -> Result<(), Error> {
-    //dbg!(&peers);
+    ////COMMENTEDFORBAR dbg!(&peers);
     for (_, peer) in peers.get_peers_list() {
         let msgs = peer.messages.clone();
         peer.messages = Messages::new();
@@ -94,10 +94,10 @@ impl Messages {
         for msg in self.messages {
             msg.send(&mut sendbuf)?;
         }
-        //dbg!("right about to send to {}", sock.peer_addr()?);
+        ////COMMENTEDFORBAR dbg!("right about to send to {}", sock.peer_addr()?);
         println!("- Sending messages to {:?} -", sock.peer_addr()?);
         sock.write_all(&sendbuf)?;
-        //dbg!("sent");
+        ////COMMENTEDFORBAR dbg!("sent");
         Ok(())
     }
 }
@@ -132,7 +132,7 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
     loop {
         match parse_message(&mut buf) {
             Some(msg) => {
-                //dbg!(&msg); // STOP PRETTY PRINTING SHIT IT'S ANNOYING
+                ////COMMENTEDFORBAR dbg!(&msg); // STOP PRETTY PRINTING SHIT IT'S ANNOYING
                 return_msgs.messages.push(msg);
             }
             None => {
@@ -149,18 +149,18 @@ pub fn handle_messages(peer: &mut Peer) -> Result<()> {
 // TODO make sure this handles handshakes smile
 /// tries to parse one message from the buffer
 fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
-    //dbg!(&buf); // STOP PRETTY PRINTING SHIT IT'S ANNOYING
+    ////COMMENTEDFORBAR dbg!(&buf); // STOP PRETTY PRINTING SHIT IT'S ANNOYING
 
     if buf.len() < 4 {
-        //dbg!("less than 4 bytes in buffer");
+        ////COMMENTEDFORBAR dbg!("less than 4 bytes in buffer");
         println!("Partial read from peer occurred");
         return None;
     }
     let len = BigEndian::read_u32(&buf[0..4]);
-    //dbg!(len);
+    ////COMMENTEDFORBAR dbg!(len);
     //this could break if buf[0..4] gets corrupted and is big
     if buf.len() < len as usize + 4 {
-        //dbg!("not enough bytes in buffer");
+        ////COMMENTEDFORBAR dbg!("not enough bytes in buffer");
         println!("Partial read from peer occurred - expected {} bytes", len);
         return None;
     }
@@ -198,7 +198,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
             }
         },
         n => {
-            //dbg!(buf[4]);
+            ////COMMENTEDFORBAR dbg!(buf[4]);
             match buf[4] {
                 4 => {
                     if n == 5 {
@@ -274,7 +274,7 @@ fn parse_message(buf: &mut Vec<u8>) -> Option<MessageType> {
 
 impl MessageType {
     fn send(self, buf: &mut Vec<u8>) -> Result<(), Error> {
-        dbg!(format!("{:?}", &self));
+        //COMMENTEDFORBAR dbg!(format!("{:?}", &self));
         match self {
             MessageType::Choke => {
                 send_len_id(buf, 1, 0)?;
@@ -345,7 +345,7 @@ fn send_bitfield(sock: &mut Vec<u8>, mut field: BitVec<u8, Msb0>) -> Result<(), 
     field.force_align();
     field.set_uninitialized(false);
 
-    //dbg!(&field);
+    ////COMMENTEDFORBAR dbg!(&field);
     let vecfield = field.into_vec();
 
     // TODO make sure length is in bytes not bits
@@ -404,7 +404,7 @@ pub fn send_handshake(peer: &mut Peer, my_id: &[u8; 20], file: &OutputFile) -> R
     buf[48..68].copy_from_slice(my_id);
     sock.write_all(&buf)?;
 
-    // dbg!(format!("send handshake bitfield {}", file.get_file_bitfield()));
+    // //COMMENTEDFORBAR dbg!(format!("send handshake bitfield {}", file.get_file_bitfield()));
     //TODO GET THE BITFIELD
     // peer.messages.messages.push(MessageType::Bitfield {
     //     field: file.get_file_bitfield(),
@@ -910,10 +910,10 @@ mod test {
             let get_sock = sender.get_mut_socket();
             messages.send_messages(get_sock).unwrap();
 
-            dbg!(reciever.get_mut_messages());
+            //COMMENTEDFORBAR dbg!(reciever.get_mut_messages());
             handle_messages(&mut reciever).unwrap();
             let recieved_messages = reciever.get_messages_clone();
-            dbg!(reciever.get_mut_messages());
+            //COMMENTEDFORBAR dbg!(reciever.get_mut_messages());
 
             assert_eq!(recieved_messages.messages[0], choke);
             assert_eq!(recieved_messages.messages[1], unchoke);

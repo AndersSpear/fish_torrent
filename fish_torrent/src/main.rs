@@ -36,7 +36,7 @@ use crate::strategy::{Strategy, Update};
 use crate::torrent::*;
 use crate::tracker::*;
 
-const STRATEGY_TIMEOUT: Duration = Duration::new(0, 100000000); // 100 milliseconds TODO: change back to .1 sec
+const STRATEGY_TIMEOUT: Duration = Duration::new(0, 70000000); // 100 milliseconds TODO: change back to .1 sec
 const KEEPALIVE_TIMEOUT: Duration = Duration::new(60, 0); // 2 minutes because T H E S P E C
 const CLEAR_REQUESTS_TIMEOUT: Duration = Duration::new(30, 0); // uh retry after like 3 minutes idk
 
@@ -112,8 +112,8 @@ fn main() {
     // you'll never guess what this line does
     let args = Args::parse();
 
-    let mut bar = ProgressBar::new_spinner().with_message("Communicating with tracker");
-    bar.enable_steady_tick(Duration::SECOND);
+    let spinner = ProgressBar::new_spinner().with_message("Communicating with tracker");
+    spinner.enable_steady_tick(Duration::SECOND);
 
     // Initialize structs and data.
     let mut self_info = SelfInfo {
@@ -158,15 +158,21 @@ fn main() {
     )
     .unwrap();
 
+    let barstyle = ProgressStyle::with_template("{msg} [{elapsed}]\n{wide_bar:.cyan/blue}\n{bytes_per_sec} {bytes} {total_bytes} ").unwrap();
+    let bar = ProgressBar::new(output_file.get_file_length() as u64).with_message("Downloading...");
+    bar.set_style(barstyle);
+    bar.enable_steady_tick(Duration::new(0, 500000000));
+
+
     // Initialize strategy state.
-    let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 500); // TODO make not 5
+    let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 1000); // TODO make not 5
 
     // Holds the partially read data from a tracker response.
     let mut partial_tracker_data = Vec::new();
 
     // Parse URL from tracker and open the initial socket.
     // NOTE: Like other sockets, this is non-blocking.
-    dbg!(get_tracker_url());
+    //COMMENTEDFORBAR dbg!(get_tracker_url());
     let mut tracker_sock = TcpStream::connect(
         *Url::parse(get_tracker_url())
             .unwrap()
@@ -212,6 +218,7 @@ fn main() {
             output_file.get_num_pieces()
         );
         if output_file.is_file_finished() {
+            bar.finish_with_message("🦀🦀🦀🦀 You have downloaded successfully!! Congrats!!! 🦀🦀🦀🦀");
             println!(
                 "🦀🦀🦀🦀 You have downloaded {} successfully!! Congrats!!! 🦀🦀🦀🦀",
                 get_file_name()
@@ -238,14 +245,14 @@ fn main() {
             strategy_state.what_do(&mut peer_list, &mut output_file);
             // if let Err(e) = p2p::send_all(&mut peer_list) {
             //     println!("failed to send to peer");
-            //     dbg!()
+            //     //COMMENTEDFORBAR dbg!()
             // }
             let mut to_disconnect = Vec::new();
             for (&peer_addr, peer) in peer_list.get_peers_list() {
                 let msgs = peer.messages.clone();
                 peer.messages = Messages::new();
                 if let Err(e) = msgs.send_messages(peer.get_mut_socket()) {
-                    dbg!(e);
+                    //COMMENTEDFORBAR dbg!(e);
                     println!("Failed to send to peer, dropping...");
                     to_disconnect.push(peer_addr);
                 }
@@ -350,11 +357,8 @@ fn main() {
                             // started to periodic.
                             if self_info.tracker_event == Event::STARTED {
                                 self_info.tracker_event = Event::PERIODIC;
-                                bar.finish_with_message("Recieved data from tracker");
-                                let barstyle = ProgressStyle::with_template("[{elapsed}] {wide_bar:.cyan/blue} {bytes_per_sec} {bytes} {total_bytes} {msg}").unwrap();
-                                bar = ProgressBar::new(output_file.get_file_length() as u64);
-                                bar.set_style(barstyle);
-                                bar.tick();
+                                spinner.finish_with_message("Recieved data from tracker");
+                                
                             }
 
                             // Deregister tracker socket, as response means connection is no longer needed.
@@ -418,7 +422,7 @@ fn main() {
                             if let Err(e) =
                                 handle_peer(peer_addr, peer, &mut output_file, &mut strategy_state)
                             {
-                                dbg!(e);
+                                //COMMENTEDFORBAR dbg!(e);
                                 println!("Disconnecting peer!");
                                 disconnect_peer(&mut poll, &mut peer_list, &mut sockets, token);
                             }
@@ -451,7 +455,7 @@ fn main() {
                         println!("there is no socket associated with token {:?}", token);
                     }
                     //bar.set_position(output_file.get_num_bytes_written() as u64);
-                    bar.set_position(390);
+                    bar.set_position(output_file.bytes_recvd as u64);
                 }
             }
         }
@@ -471,7 +475,7 @@ fn disconnect_peer(
             println!("Successfully removed peer from poll!");
         }
         Err(e) => {
-            dbg!(e);
+            //COMMENTEDFORBAR dbg!(e);
         }
     }
 
@@ -480,7 +484,7 @@ fn disconnect_peer(
             println!("Successfully disconnected peer!");
         }
         Err(e) => {
-            dbg!(e);
+            //COMMENTEDFORBAR dbg!(e);
         }
     }
 }
@@ -601,14 +605,14 @@ fn handle_peer(
                     begin.try_into().unwrap(),
                     block,
                 ) {
-                    dbg!(format!("Piece {} is complete, but not hashed.", index));
+                    //COMMENTEDFORBAR dbg!(format!("Piece {} is complete, but not hashed.", index));
                     // does the piece match with our hash
                     if let Ok(true) = output_file.compare_piece_hash(
                         index.try_into().unwrap(),
                         &get_piece_hash(index.try_into().unwrap())
                             .expect("failed to get piece hash"),
                     ) {
-                        dbg!(format!("Hash for piece {} matches!!!", index));
+                        //COMMENTEDFORBAR dbg!(format!("Hash for piece {} matches!!!", index));
                         output_file
                             .set_piece_finished(index.try_into().unwrap())
                             .expect("failed to set piece to finished");
@@ -617,7 +621,7 @@ fn handle_peer(
                         strategy_state
                             .push_update(Some(peer_addr), MessageType::Have { index: index });
                     } else {
-                        dbg!(format!("Hash for piece {} does not match >:(", index));
+                        //COMMENTEDFORBAR dbg!(format!("Hash for piece {} does not match >:(", index));
                         // otherwise, something went wrong when downloading the piece so lets try again :)
                         output_file
                             .clear_piece(index.try_into().unwrap())
@@ -652,7 +656,7 @@ fn handle_peer(
 
 fn create_peer_id() -> [u8; 20] {
     let my_peer_id = Alphanumeric.sample_string(&mut rand::thread_rng(), 20);
-    dbg!(&my_peer_id);
+    //COMMENTEDFORBAR dbg!(&my_peer_id);
     my_peer_id.into_bytes().try_into().unwrap()
 }
 
@@ -684,8 +688,8 @@ mod test {
         // should make bitvec [1, 0, 1]
         assert_eq!(field.len(), 8);
         let _ = field.drain(field.len() - ((8 - (num_pieces % 8)) % 8)..);
-        dbg!(&field);
-        dbg!(&correct_field);
+        //COMMENTEDFORBAR dbg!(&field);
+        //COMMENTEDFORBAR dbg!(&correct_field);
         assert_eq!(field.len(), num_pieces);
         assert_eq!(field, correct_field);
     }
@@ -701,8 +705,8 @@ mod test {
 
         assert_eq!(field.len(), 16);
         let _ = field.drain(field.len() - (8 - (num_pieces % 8))..);
-        dbg!(&field);
-        dbg!(&correct_field);
+        //COMMENTEDFORBAR dbg!(&field);
+        //COMMENTEDFORBAR dbg!(&correct_field);
         assert_eq!(field.len(), num_pieces);
         assert_eq!(field, correct_field);
     }

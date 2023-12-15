@@ -158,7 +158,7 @@ pub fn get_tracker_response_from_vec_u8(buf: &Vec<u8>) -> TrackerResponse {
 
     // Find the position of the double CRLF separator
     //iterates through byte vector
-    //dbg!(buf);
+    ////COMMENTEDFORBAR dbg!(buf);
     let body = parse_body_from_response(buf)
         .expect("parse_body_from_response in get_tracker_from_response fail");
 
@@ -199,7 +199,7 @@ pub fn handle_tracker_response(
         }
         Err(e) => {
             //instantly leave
-            dbg!("tracker partial read occurred");
+            //COMMENTEDFORBAR dbg!("tracker partial read occurred");
             return (buf, None);
         }
     };
@@ -306,7 +306,7 @@ mod tests {
         let tr = handle_tracker_response(vec![], &mut tracker_sock);
         match tr {
             (vec, Some(tr)) => {
-                dbg!(&tr.socket_addr_list);
+                //COMMENTEDFORBAR dbg!(&tr.socket_addr_list);
                 assert!(tr.socket_addr_list.len() >= 1);
             }
             (vec, None) => {
@@ -338,6 +338,6 @@ mod tests {
     fn test_bytes_to_urlencoding() {
         let res = bytes_to_urlencoding(&[0x05, 0x61, 0x61, 0x61, 0xc3, 0xb5]);
         assert_eq!("%05%61%61%61%C3%B5", res);
-        dbg!(res);
+        //COMMENTEDFORBAR dbg!(res);
     }
 }

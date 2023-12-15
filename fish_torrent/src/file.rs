@@ -24,7 +24,7 @@ pub struct OutputFile {
     bytes: Vec<BitVec<u8, Msb0>>,
     blocks: Vec<BitVec<u8, Msb0>>,
     pieces: BitVec<u8, Msb0>,
-    bytes_recvd: usize,
+    pub bytes_recvd: usize,
     pub bytes_sent: usize,
 }
 
@@ -157,7 +157,7 @@ impl OutputFile {
             //}
 
             self.bytes_recvd += block.len();
-            dbg!(self.bytes_recvd);
+            //COMMENTEDFORBAR dbg!(self.bytes_recvd);
 
             Ok(finished)
         }
@@ -331,16 +331,16 @@ mod test {
         test_file.set_piece_finished(1);
         // See if that data reads back.
         let test = test_file.read_block(0, 0, 4).unwrap();
-        dbg!(&std::str::from_utf8(&test).unwrap());
+        //COMMENTEDFORBAR dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b'a', b'a', b'a', b'a']));
         let test = test_file.read_block(1, 0, 3).unwrap();
-        dbg!(&std::str::from_utf8(&test).unwrap());
+        //COMMENTEDFORBAR dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b'z', b'z', b'z']));
         // Write some more data, this time at an offset. And read it back.
         _ = test_file.write_block(0, 3, Vec::from([b't']));
         _ = test_file.write_block(0, 4, Vec::from([b'v']));
         let test = test_file.read_block(0, 3, 2).unwrap();
-        dbg!(&std::str::from_utf8(&test).unwrap());
+        //COMMENTEDFORBAR dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b't', b'v']));
         // Write data up to the very end of the last piece
         _ = test_file.write_block(4, 0, Vec::from([b'a']));
@@ -349,7 +349,7 @@ mod test {
         test_file.set_piece_finished(4);
         assert_eq!(test_file.check_piece_finished(4).unwrap(), true);
         let test = test_file.read_block(4, 0, 3).unwrap();
-        dbg!(&std::str::from_utf8(&test).unwrap());
+        //COMMENTEDFORBAR dbg!(&std::str::from_utf8(&test).unwrap());
         assert_eq!(test, Vec::from([b'a', b'b', b'c']));
 
         // Make sure that the file is the expected size.
@@ -452,8 +452,8 @@ mod test {
         }
 
         // Write to file and check to make sure that BitVec matches the bytes written.
-        //dbg!(&test_file.bytes[0]);
-        //dbg!(&test_file.bytes[1]);
+        ////COMMENTEDFORBAR dbg!(&test_file.bytes[0]);
+        ////COMMENTEDFORBAR dbg!(&test_file.bytes[1]);
         // No writes should return true, as none of them fill the piece.
         assert_eq!(
             test_file
@@ -485,8 +485,8 @@ mod test {
         assert_eq!(test_file.bytes[0].get(7).as_deref().unwrap(), &true);
         assert_eq!(test_file.bytes[1].get(0).as_deref().unwrap(), &true);
         assert_eq!(test_file.bytes[1].get(1).as_deref().unwrap(), &true);
-        //dbg!(&test_file.bytes[0]);
-        //dbg!(&test_file.bytes[1]);
+        ////COMMENTEDFORBAR dbg!(&test_file.bytes[0]);
+        ////COMMENTEDFORBAR dbg!(&test_file.bytes[1]);
 
         // Random spot checks to make sure bits weren't randomly flipped.
         assert_eq!(test_file.bytes[0].get(2).as_deref().unwrap(), &false);
@@ -506,7 +506,7 @@ mod test {
         assert_eq!(test_file.check_piece_finished(1).unwrap(), true);
         test_file.set_piece_finished(1).unwrap();
         assert_eq!(test_file.get_file_bitfield()[1], true);
-        //dbg!(&test_file.bytes[1]);
+        ////COMMENTEDFORBAR dbg!(&test_file.bytes[1]);
     }
 
     #[test]
