@@ -201,9 +201,16 @@ fn main() {
 
     loop {
         // check if you have downloaded the file
-        println!(" === Completed {} pieces out of {} === ", output_file.get_file_bitfield().count_ones(), output_file.get_num_pieces());
+        println!(
+            " === Completed {} pieces out of {} === ",
+            output_file.get_file_bitfield().count_ones(),
+            output_file.get_num_pieces()
+        );
         if output_file.is_file_finished() {
-            println!("🦀🦀🦀🦀 You have downloaded {} successfully!! Congrats!!! 🦀🦀🦀🦀", get_file_name());
+            println!(
+                "🦀🦀🦀🦀 You have downloaded {} successfully!! Congrats!!! 🦀🦀🦀🦀",
+                get_file_name()
+            );
         }
         // should we send a keepalive?
         if timers.keepalive.timeout_huh() {
@@ -322,7 +329,8 @@ fn main() {
                         if let Some(tracker_response) = response {
                             println!("- Tracker response parsed {:?} -", &tracker_response);
                             // Reset the tracker timer based on the interval received from tracker.
-                            timers.tracker.timeout = Duration::new(tracker_response.interval.try_into().unwrap(), 0);
+                            timers.tracker.timeout =
+                                Duration::new(tracker_response.interval.try_into().unwrap(), 0);
 
                             // Add all peers received from tracker to peer_list and register them
                             // with the poll instance.
@@ -397,7 +405,9 @@ fn main() {
                         let peer = peer_list.find_peer(peer_addr).unwrap();
                         if peer.is_complete() {
                             println!("- Handling peer {:?} -", &peer_addr);
-                            if let Err(e) = handle_peer(peer_addr, peer, &mut output_file, &mut strategy_state) {
+                            if let Err(e) =
+                                handle_peer(peer_addr, peer, &mut output_file, &mut strategy_state)
+                            {
                                 dbg!(e);
                                 println!("Disconnecting peer!");
                                 disconnect_peer(&mut poll, &mut peer_list, &mut sockets, token);
@@ -436,7 +446,12 @@ fn main() {
     }
 }
 
-fn disconnect_peer(poll: &mut Poll, peer_list: &mut Peers, sockets: &mut HashMap<Token, SocketAddr>, token: Token) {
+fn disconnect_peer(
+    poll: &mut Poll,
+    peer_list: &mut Peers,
+    sockets: &mut HashMap<Token, SocketAddr>,
+    token: Token,
+) {
     let peer_addr = sockets.remove(&token).unwrap();
     let mut peer = peer_list.remove_peer(peer_addr).unwrap();
     match poll.registry().deregister(peer.get_mut_socket()) {
@@ -452,7 +467,7 @@ fn disconnect_peer(poll: &mut Poll, peer_list: &mut Peers, sockets: &mut HashMap
         Ok(_) => {
             println!("Successfully disconnected peer!");
         }
-        Err(e) => { 
+        Err(e) => {
             dbg!(e);
         }
     }
@@ -495,7 +510,10 @@ fn get_new_token() -> Token {
     Token(TOKEN_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
 }
 
-fn find_token_by_peer(peer_addr: SocketAddr, sockets: &HashMap<Token, SocketAddr>) -> Option<Token> {
+fn find_token_by_peer(
+    peer_addr: SocketAddr,
+    sockets: &HashMap<Token, SocketAddr>,
+) -> Option<Token> {
     for (&token, addr) in sockets {
         if peer_addr == *addr {
             return Some(token);
@@ -511,13 +529,13 @@ fn handle_peer(
     peer: &mut Peer,
     output_file: &mut OutputFile,
     strategy_state: &mut Strategy,
-) -> Result<(), Error>{
-    p2p::handle_messages(peer)?; 
+) -> Result<(), Error> {
+    p2p::handle_messages(peer)?;
 
     let messages = peer.messages.messages.clone();
 
     for msg in messages {
-        if let MessageType::Piece{ index, begin, .. } = msg {
+        if let MessageType::Piece { index, begin, .. } = msg {
             println!("Message is Piece with index {} and begin {}", index, begin);
         } else {
             println!("Message is {:?}", msg);
@@ -565,10 +583,7 @@ fn handle_peer(
                     begin.try_into().unwrap(),
                     block,
                 ) {
-                    dbg!(format!(
-                        "Piece {} is complete, but not hashed.",
-                        index
-                    ));
+                    dbg!(format!("Piece {} is complete, but not hashed.", index));
                     // does the piece match with our hash
                     if let Ok(true) = output_file.compare_piece_hash(
                         index.try_into().unwrap(),

@@ -230,13 +230,13 @@ impl OutputFile {
         let mut hasher = Sha1::new();
         //if self.check_piece_finished(index)? == true {
         hasher.update(self.read_block(
-           index,
-           0,
-           if index == self.num_pieces - 1 {
-               self.last_piece_size
-           } else {
-               self.piece_size
-           },
+            index,
+            0,
+            if index == self.num_pieces - 1 {
+                self.last_piece_size
+            } else {
+                self.piece_size
+            },
         )?);
         hasher.finalize_into((&mut hash).into());
         Ok(hash)
@@ -512,7 +512,9 @@ mod test {
         //    true
         //);
         for i in 0..piece_size {
-            test_file.write_block(0, i, Vec::from([97 + i as u8])).unwrap();
+            test_file
+                .write_block(0, i, Vec::from([97 + i as u8]))
+                .unwrap();
         }
         test_file.set_piece_finished(0);
         // See if the hash produced is expected.
