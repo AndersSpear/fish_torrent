@@ -346,6 +346,12 @@ fn main() {
                                 tracker_response,
                             );
 
+                            // If this is the first request, change tracker event from
+                            // started to periodic.
+                            if self_info.tracker_event == Event::STARTED {
+                                self_info.tracker_event = Event::PERIODIC;
+                            }
+
                             // Deregister tracker socket, as response means connection is no longer needed.
                             poll.registry()
                                 .deregister(&mut tracker_sock)
@@ -379,12 +385,6 @@ fn main() {
                                 .to_string(),
                         );
                         send_tracker_request(&tracker_request, &mut tracker_sock).unwrap();
-
-                        // If this is the first request, change tracker event from
-                        // started to periodic.
-                        if self_info.tracker_event == Event::STARTED {
-                            self_info.tracker_event = Event::PERIODIC;
-                        }
 
                         // Register the socket for reading response.
                         poll.registry()
@@ -562,7 +562,7 @@ fn handle_peer(
                 peer.set_piece_bit(index.try_into().unwrap(), true);
             }
             MessageType::Bitfield { mut field } => {
-                let _ = field.drain(field.len() - (8 - (output_file.get_num_pieces() % 8))..);
+                let _ = field.drain(field.len() - ((8 - (output_file.get_num_pieces() % 8)) % 8)..);
                 peer.init_piece_bitfield(field);
             }
             MessageType::Request {
@@ -582,6 +582,10 @@ fn handle_peer(
                 begin,
                 block,
             } => {
+                // we dont already have the piece right? RIGHT?
+                if let Some(true) = output_file.is_block_finished(index.try_into().unwrap(), begin.try_into().unwrap()) {
+                    continue;
+                }
                 // did we finish the piece?
                 if let Ok(true) = output_file.write_block(
                     index.try_into().unwrap(),
@@ -670,7 +674,7 @@ mod test {
 
         // should make bitvec [1, 0, 1]
         assert_eq!(field.len(), 8);
-        let _ = field.drain(field.len() - (8 - (num_pieces % 8))..);
+        let _ = field.drain(field.len() - ((8 - (num_pieces % 8)) % 8)..);
         dbg!(&field);
         dbg!(&correct_field);
         assert_eq!(field.len(), num_pieces);
