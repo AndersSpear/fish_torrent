@@ -105,6 +105,14 @@ impl OutputFile {
         self.pieces.first_zero().is_none()
     }
 
+    pub fn get_num_bytes_written(&self) -> usize {
+        let mut res = 0;
+        for i in 0..self.num_pieces {
+            res += self.bytes[i].count_ones();
+        }
+        res
+    }
+
     /// Writes a block (Vector) of bytes to the specified piece index and
     /// beginning offset.
     /// Returns true if this call to write_block finishes the piece specified by index.
