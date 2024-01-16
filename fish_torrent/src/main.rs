@@ -158,11 +158,13 @@ fn main() {
     )
     .unwrap();
 
-    let barstyle = ProgressStyle::with_template("{msg} [{elapsed}]\n{wide_bar:.cyan/blue}\n{bytes_per_sec} {bytes} {total_bytes} ").unwrap();
+    let barstyle = ProgressStyle::with_template(
+        "{msg} [{elapsed}]\n{wide_bar:.cyan/blue}\n{bytes_per_sec} {bytes} {total_bytes} ",
+    )
+    .unwrap();
     let bar = ProgressBar::new(output_file.get_file_length() as u64).with_message("Downloading...");
     bar.set_style(barstyle);
     bar.enable_steady_tick(Duration::new(0, 500000000));
-
 
     // Initialize strategy state.
     let mut strategy_state = Strategy::new(get_number_of_pieces().try_into().unwrap(), 1000); // TODO make not 5
@@ -218,7 +220,9 @@ fn main() {
             output_file.get_num_pieces()
         );
         if output_file.is_file_finished() {
-            bar.finish_with_message("🦀🦀🦀🦀 You have downloaded successfully!! Congrats!!! 🦀🦀🦀🦀");
+            bar.finish_with_message(
+                "🦀🦀🦀🦀 You have downloaded successfully!! Congrats!!! 🦀🦀🦀🦀",
+            );
             println!(
                 "🦀🦀🦀🦀 You have downloaded {} successfully!! Congrats!!! 🦀🦀🦀🦀",
                 get_file_name()
@@ -358,7 +362,6 @@ fn main() {
                             if self_info.tracker_event == Event::STARTED {
                                 self_info.tracker_event = Event::PERIODIC;
                                 spinner.finish_with_message("Recieved data from tracker");
-                                
                             }
 
                             // Deregister tracker socket, as response means connection is no longer needed.
@@ -367,9 +370,10 @@ fn main() {
                                 .expect("tracker deregister fail");
 
                             // Shut down the tracker for reasons mentioned above.
-                            tracker_sock
-                                .shutdown(net::Shutdown::Both)
-                                .expect("tracker was not shutdown :(");
+                            // ANDERS not shutdown cuz bricks on mac
+                            //tracker_sock
+                            //    .shutdown(net::Shutdown::Both)
+                            //    .expect("tracker was not shutdown :(");
                             println!("- Tracker connection closed -");
                         } else {
                             println!("- Tracker partial read -");
